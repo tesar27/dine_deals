@@ -6,7 +6,7 @@ import 'package:dine_deals/src/pages/home/account_page.dart';
 
 /// Page to redirect users to the appropriate page depending on the initial auth state
 class SplashPage extends StatefulWidget {
-  const SplashPage({Key? key}) : super(key: key);
+  const SplashPage({super.key});
 
   @override
   SplashPageState createState() => SplashPageState();

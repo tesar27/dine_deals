@@ -63,5 +63,11 @@
 	<string>Your app needs access to the photo library to allow you to upload and share photos.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Your app needs access to the camera to allow you to take photos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to show nearby deals.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>We need your location to show nearby deals.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to show nearby deals.</string>
 </dict>
 </plist>

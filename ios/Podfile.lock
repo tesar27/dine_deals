@@ -1,6 +1,8 @@
 PODS:
   - app_links (0.0.2):
     - Flutter
+  - apple_maps_flutter (0.0.1):
+    - Flutter
   - Flutter (1.0.0)
   - image_picker_ios (0.0.1):
     - Flutter
@@ -15,6 +17,7 @@ PODS:
 
 DEPENDENCIES:
   - app_links (from `.symlinks/plugins/app_links/ios`)
+  - apple_maps_flutter (from `.symlinks/plugins/apple_maps_flutter/ios`)
   - Flutter (from `Flutter`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
@@ -24,6 +27,8 @@ DEPENDENCIES:
 EXTERNAL SOURCES:
   app_links:
     :path: ".symlinks/plugins/app_links/ios"
+  apple_maps_flutter:
+    :path: ".symlinks/plugins/apple_maps_flutter/ios"
   Flutter:
     :path: Flutter
   image_picker_ios:
@@ -37,6 +42,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   app_links: 3da4c36b46cac3bf24eb897f1a6ce80bda109874
+  apple_maps_flutter: 2237d66a8e242082a2d88134af372f7b3375d7a6
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   image_picker_ios: 7fe1ff8e34c1790d6fff70a32484959f563a928a
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564

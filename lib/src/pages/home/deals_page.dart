@@ -1,57 +1,83 @@
+import 'package:dine_deals/src/widgets/food_categories.dart';
+import 'package:dine_deals/src/widgets/hero_carousel.dart';
+import 'package:dine_deals/src/widgets/map_widget.dart';
+import 'package:dine_deals/src/widgets/offers_list.dart';
+import 'package:dine_deals/src/widgets/zurich_osm_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
+import 'package:apple_maps_flutter/apple_maps_flutter.dart' as apple;
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 
 class DealsPage extends StatefulWidget {
   const DealsPage({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _DealsPageState createState() => _DealsPageState();
 }
 
 class _DealsPageState extends State<DealsPage> {
   String _chosenCity = 'Choose your city';
   bool _iconTapped = false;
+  bool _isMapView = false;
 
   final List<String> _cities = [
-    'New York',
-    'Los Angeles',
-    'Chicago',
-    'Houston',
-    'Phoenix',
-    'Philadelphia',
-    'San Antonio',
-    'San Diego',
-    'Dallas',
-    'San Jose',
-    'Austin',
-    'Jacksonville',
-    'Fort Worth',
-    'Columbus',
-    'Charlotte',
-    'San Francisco',
-    'Indianapolis',
-    'Seattle',
-    'Denver',
-    'Washington'
+    'Zurich',
+    'Geneva',
+    'Basel',
+    'Lausanne',
+    'Bern',
+    'Winterthur',
+    'Lucerne',
+    'St. Gallen',
+    'Lugano',
+    'Biel/Bienne',
+    'Thun',
+    'Köniz',
+    'La Chaux-de-Fonds',
+    'Schaffhausen',
+    'Fribourg',
+    'Chur',
+    'Neuchâtel',
+    'Vernier',
+    'Sion',
+    'Uster'
   ];
 
   void _showCitiesList() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (BuildContext context) {
-        return ListView.builder(
-          itemCount: _cities.length,
-          itemBuilder: (BuildContext context, int index) {
-            return ListTile(
-              title: Text(_cities[index]),
-              onTap: () {
-                setState(() {
-                  _chosenCity = _cities[index];
-                  _iconTapped = false;
-                });
-                Navigator.pop(context);
+        return Padding(
+          padding: const EdgeInsets.only(top: 16.0), // Add padding on the top
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height *
+                0.92, // Adjust the height as needed
+            child: ListView.builder(
+              itemCount: _cities.length,
+              itemBuilder: (BuildContext context, int index) {
+                return ListTile(
+                  title: Text(
+                    _cities[index],
+                    style: const TextStyle(
+                      fontSize: 18, // Change the font size
+                      fontWeight: FontWeight.bold, // Change the font weight
+                    ),
+                  ),
+                  onTap: () {
+                    setState(() {
+                      _chosenCity = _cities[index];
+                      _iconTapped = false;
+                    });
+                    Navigator.pop(context);
+                  },
+                );
               },
-            );
-          },
+            ),
+          ),
         );
       },
     );
@@ -102,8 +128,91 @@ class _DealsPageState extends State<DealsPage> {
           ),
         ),
       ),
-      body: const Center(
-        child: Text('This is the new page'),
+      body: Stack(
+        children: [
+          if (_isMapView)
+            ZurichOSMWidget(
+              onMarkerTapped: (restaurantName) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Selected: $restaurantName'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+          )
+          else
+            const SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FoodCategories(),
+                  HeroCarousel(),
+                  OffersList(),
+                ],
+              ),
+            ),
+          Positioned(
+            bottom: 16,
+            left: 16,
+            right: 16,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isMapView = false;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 24),
+                    decoration: BoxDecoration(
+                      color: _isMapView ? Colors.grey[300] : Colors.grey[700],
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        bottomLeft: Radius.circular(30),
+                      ),
+                    ),
+                    child: Text(
+                      'List',
+                      style: TextStyle(
+                        color: _isMapView ? Colors.black : Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isMapView = true;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 24),
+                    decoration: BoxDecoration(
+                      color: _isMapView ? Colors.grey[700] : Colors.grey[300],
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(30),
+                        bottomRight: Radius.circular(30),
+                      ),
+                    ),
+                    child: Text(
+                      'Map',
+                      style: TextStyle(
+                        color: _isMapView ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
