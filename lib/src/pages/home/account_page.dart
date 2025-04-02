@@ -58,13 +58,13 @@ class _AccountPageState extends State<AccountPage> {
       _loading = true;
       _editing = false;
     });
-    final userName = _emailController.text.trim();
-    final website = _metaDataController.text.trim();
+    final email = _emailController.text.trim();
+    final phone = _metaDataController.text.trim();
     final user = supabase.auth.currentUser;
     final updates = {
       'id': user!.id,
-      'username': userName,
-      'website': website,
+      'email': email,
+      'phone': phone,
       'updated_at': DateTime.now().toIso8601String(),
     };
     try {
@@ -192,12 +192,12 @@ class _AccountPageState extends State<AccountPage> {
           if (_editing) ...[
             TextFormField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: 'User Name'),
+              decoration: const InputDecoration(labelText: 'Email'),
             ),
             const SizedBox(height: 18),
             TextFormField(
               controller: _metaDataController,
-              decoration: const InputDecoration(labelText: 'Website'),
+              decoration: const InputDecoration(labelText: 'Phone'),
             ),
             const SizedBox(height: 18),
             ElevatedButton(
@@ -214,7 +214,7 @@ class _AccountPageState extends State<AccountPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'User Name:',
+                  'Email:',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
@@ -228,7 +228,7 @@ class _AccountPageState extends State<AccountPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Website:',
+                  'Phone:',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(

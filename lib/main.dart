@@ -1,5 +1,6 @@
 import 'package:dine_deals/src/pages/home/home_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/src/pages/auth/otp_signup_page.dart';
 
@@ -9,7 +10,7 @@ Future<void> main() async {
     anonKey:
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwY2V5ZWtmZGF1eHNibGppaHN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkxOTQ1MjUsImV4cCI6MjA1NDc3MDUyNX0.U5go8S7atXgblQDKFXlk707J_d8JQlaBeiRr3bVJYGY',
   );
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 final supabase = Supabase.instance.client;
