@@ -1,14 +1,10 @@
 import 'package:dine_deals/src/widgets/food_categories.dart';
 import 'package:dine_deals/src/widgets/hero_carousel.dart';
-import 'package:dine_deals/src/widgets/map_widget.dart';
 import 'package:dine_deals/src/widgets/offers_list.dart';
-import 'package:dine_deals/src/widgets/zurich_osm_widget.dart';
+import 'package:dine_deals/src/widgets/map_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
-import 'package:apple_maps_flutter/apple_maps_flutter.dart' as apple;
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart' as latlong;
+// import 'package:flutter/foundation.dart'
+// show defaultTargetPlatform, TargetPlatform;
 
 class DealsPage extends StatefulWidget {
   const DealsPage({super.key});
@@ -131,16 +127,16 @@ class _DealsPageState extends State<DealsPage> {
       body: Stack(
         children: [
           if (_isMapView)
-            ZurichOSMWidget(
+            MapWidget(
               onMarkerTapped: (restaurantName) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Selected: $restaurantName'),
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          },
-          )
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Selected: $restaurantName'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+            )
           else
             const SingleChildScrollView(
               child: Column(

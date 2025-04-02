@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dine_deals/src/pages/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/main.dart';
@@ -6,6 +7,10 @@ import 'package:dine_deals/src/pages/home/account_page.dart';
 
 class OtpSignupPage extends StatefulWidget {
   const OtpSignupPage({super.key});
+
+  static Route<void> route() {
+    return MaterialPageRoute<void>(builder: (_) => const OtpSignupPage());
+  }
 
   @override
   State<OtpSignupPage> createState() => _OtpSignupPageState();
@@ -63,11 +68,11 @@ class _OtpSignupPageState extends State<OtpSignupPage> {
       await supabase.auth.verifyOTP(
         email: _emailController.text.trim(),
         token: _otpController.text.trim(),
-        type: OtpType.magiclink,
+        type: OtpType.email,
       );
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const AccountPage()),
+          MaterialPageRoute(builder: (context) => const HomePage()),
         );
       }
     } on AuthException catch (error) {

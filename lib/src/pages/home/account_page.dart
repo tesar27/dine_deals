@@ -1,3 +1,4 @@
+import 'package:dine_deals/src/pages/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/main.dart';
@@ -7,13 +8,17 @@ import 'package:dine_deals/src/widgets/avatar.dart';
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
 
+  static Route<void> route() {
+    return MaterialPageRoute<void>(builder: (_) => const AccountPage());
+  }
+
   @override
   State<AccountPage> createState() => _AccountPageState();
 }
 
 class _AccountPageState extends State<AccountPage> {
-  final _usernameController = TextEditingController();
-  final _websiteController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _metaDataController = TextEditingController();
 
   String? _avatarUrl;
   var _loading = true;
@@ -28,9 +33,9 @@ class _AccountPageState extends State<AccountPage> {
     try {
       final userId = supabase.auth.currentSession!.user.id;
       final data =
-          await supabase.from('profiles').select().eq('id', userId).single();
-      _usernameController.text = (data['username'] ?? '') as String;
-      _websiteController.text = (data['website'] ?? '') as String;
+          await supabase.from('users').select().eq('id', userId).single();
+      _emailController.text = (data['email'] ?? '') as String;
+      _metaDataController.text = (data['raw_user_meta_data'] ?? '') as String;
       _avatarUrl = (data['avatar_url'] ?? '') as String;
     } on PostgrestException catch (error) {
       if (mounted) context.showSnackBar(error.message, isError: true);
@@ -53,8 +58,8 @@ class _AccountPageState extends State<AccountPage> {
       _loading = true;
       _editing = false;
     });
-    final userName = _usernameController.text.trim();
-    final website = _websiteController.text.trim();
+    final userName = _emailController.text.trim();
+    final website = _metaDataController.text.trim();
     final user = supabase.auth.currentUser;
     final updates = {
       'id': user!.id,
@@ -63,7 +68,7 @@ class _AccountPageState extends State<AccountPage> {
       'updated_at': DateTime.now().toIso8601String(),
     };
     try {
-      await supabase.from('profiles').upsert(updates);
+      await supabase.from('users').upsert(updates);
       if (mounted) context.showSnackBar('Successfully updated profile!');
     } on PostgrestException catch (error) {
       if (mounted) context.showSnackBar(error.message, isError: true);
@@ -114,7 +119,7 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _onUpload(String imageUrl) async {
     try {
       final userId = supabase.auth.currentUser!.id;
-      await supabase.from('profiles').upsert({
+      await supabase.from('users').upsert({
         'id': userId,
         'avatar_url': imageUrl,
       });
@@ -147,8 +152,8 @@ class _AccountPageState extends State<AccountPage> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _websiteController.dispose();
+    _emailController.dispose();
+    _metaDataController.dispose();
     super.dispose();
   }
 
@@ -156,7 +161,15 @@ class _AccountPageState extends State<AccountPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Center(child: Text('Profile')),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const HomePage()),
+            );
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -178,12 +191,12 @@ class _AccountPageState extends State<AccountPage> {
           const SizedBox(height: 18),
           if (_editing) ...[
             TextFormField(
-              controller: _usernameController,
+              controller: _emailController,
               decoration: const InputDecoration(labelText: 'User Name'),
             ),
             const SizedBox(height: 18),
             TextFormField(
-              controller: _websiteController,
+              controller: _metaDataController,
               decoration: const InputDecoration(labelText: 'Website'),
             ),
             const SizedBox(height: 18),
@@ -205,7 +218,7 @@ class _AccountPageState extends State<AccountPage> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  _usernameController.text,
+                  _emailController.text,
                   style: const TextStyle(fontSize: 18),
                 ),
               ],
@@ -219,7 +232,7 @@ class _AccountPageState extends State<AccountPage> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  _websiteController.text,
+                  _metaDataController.text,
                   style: const TextStyle(fontSize: 18),
                 ),
               ],
