@@ -117,14 +117,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
         children: [
           if (_isMapView)
             MapWidget(
-              onMarkerTapped: (restaurantName) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Selected: $restaurantName'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              },
+              onMarkerTapped: (restaurantName) {},
               chosenCity: _chosenCity,
             )
           else

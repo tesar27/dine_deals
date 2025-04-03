@@ -135,92 +135,104 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         return Column(
           children: [
             Expanded(
-              child: FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: const LatLng(zurichLat, zurichLng),
-                  initialZoom: _currentZoom,
-                ),
+              child: Stack(
                 children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.dinedeal.app',
-                    maxZoom: 19,
-                  ),
-                  MarkerLayer(
-                    markers: restaurants.map((restaurant) {
-                      // Extract coordinates from restaurant data
-                      final double lat = restaurant['latitude'] != null
-                          ? double.parse(restaurant['latitude'].toString())
-                          : zurichLat;
+                  // Wrap FlutterMap with a Stack
+                  FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: const LatLng(zurichLat, zurichLng),
+                      initialZoom: _currentZoom,
+                    ),
+                    children: [
+                      TileLayer(
+                        // CARTO Voyager No Labels - designed for minimal place markers
+                        urlTemplate:
+                            'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                        subdomains: const [
+                          'a',
+                          'b',
+                          'c',
+                          'd'
+                        ], // Standard CARTO subdomains
+                        // It's polite and often required to identify your app
+                        // IMPORTANT: Replace with your actual package name
+                        userAgentPackageName: 'com.dinedeals.app',
+                        // tileProvider: CachedTileProvider(), // Optional: Enables caching tiles locally
+                      ),
+                      MarkerLayer(
+                        markers: restaurants.map((restaurant) {
+                          // Extract coordinates from restaurant data
+                          final double lat = restaurant['latitude'] != null
+                              ? double.parse(restaurant['latitude'].toString())
+                              : zurichLat;
 
-                      final double lng = restaurant['longitude'] != null
-                          ? double.parse(restaurant['longitude'].toString())
-                          : zurichLng;
+                          final double lng = restaurant['longitude'] != null
+                              ? double.parse(restaurant['longitude'].toString())
+                              : zurichLng;
 
-                      final String name =
-                          restaurant['name'] ?? 'Unnamed Restaurant';
-                      final String address =
-                          restaurant['address'] ?? 'No address';
+                          final String name =
+                              restaurant['name'] ?? 'Unnamed Restaurant';
+                          final String address =
+                              restaurant['address'] ?? 'No address';
 
-                      return Marker(
-                        width: 120.0,
-                        height: 60.0,
-                        point: LatLng(lat, lng),
-                        child: GestureDetector(
-                          onTap: () {
-                            if (widget.onMarkerTapped != null) {
-                              widget.onMarkerTapped!(name);
-                            }
+                          return Marker(
+                            width: 120.0,
+                            height: 60.0,
+                            point: LatLng(lat, lng),
+                            child: GestureDetector(
+                              onTap: () {
+                                if (widget.onMarkerTapped != null) {
+                                  widget.onMarkerTapped!(name);
+                                }
 
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: Text(name),
-                                content: Text(address),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(),
-                                    child: const Text('Close'),
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text(name),
+                                    content: Text(address),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(),
+                                        child: const Text('Close'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              child: const Column(
+                                children: [
+                                  Icon(
+                                    Icons.restaurant,
+                                    color: Colors.red,
+                                    size: 30,
                                   ),
                                 ],
                               ),
-                            );
-                          },
-                          child: Column(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.7),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 2,
-                                ),
-                                child: Text(
-                                  name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const Icon(
-                                Icons.location_pin,
-                                color: Colors.red,
-                                size: 30,
-                              ),
-                            ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      // --- Attribution Layer (Very Important!) ---
+                      // You MUST attribute the map data source (OSM) and the tile provider (CARTO)
+                      const RichAttributionWidget(
+                        popupInitialDisplayDuration: Duration(seconds: 5),
+                        animationConfig: ScaleRAWA(), // Optional nice animation
+                        attributions: [
+                          TextSourceAttribution(
+                            '© OpenStreetMap contributors',
+                            // Optional: Make OSM link clickable (requires url_launcher package)
+                            // onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                          TextSourceAttribution(
+                            'CARTO',
+                            // Optional: Make CARTO link clickable (requires url_launcher package)
+                            // onTap: () => launchUrl(Uri.parse('https://carto.com/attributions')),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),
