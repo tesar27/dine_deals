@@ -125,6 +125,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                   ),
                 );
               },
+              chosenCity: _chosenCity,
             )
           else
             const SingleChildScrollView(

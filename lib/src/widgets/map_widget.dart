@@ -1,65 +1,101 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:dine_deals/src/providers/restaurants_provider.dart';
+import 'package:dine_deals/src/providers/cities_provider.dart';
 
-class MapWidget extends StatefulWidget {
+class MapWidget extends ConsumerStatefulWidget {
   final Function(String)? onMarkerTapped;
+  final String chosenCity;
 
   const MapWidget({
     super.key,
     this.onMarkerTapped,
+    required this.chosenCity,
   });
 
   @override
-  State<MapWidget> createState() => _MapWidgetState();
+  ConsumerState<MapWidget> createState() => _MapWidgetState();
 }
 
-class _MapWidgetState extends State<MapWidget> {
+class _MapWidgetState extends ConsumerState<MapWidget> {
   final MapController _mapController = MapController();
 
-  // Zurich coordinates
+  // Default Zurich coordinates
   static const double zurichLat = 47.3769;
   static const double zurichLng = 8.5417;
 
   // Default zoom level
   double _currentZoom = 13.0;
+  bool _isInitialLoad = true;
 
-  // List of Zurich restaurants
-  final List<Map<String, dynamic>> _restaurants = [
-    {
-      'name': 'Hiltl',
-      'lat': 47.3728,
-      'lng': 8.5386,
-      'description': 'World\'s oldest vegetarian restaurant'
-    },
-    {
-      'name': 'Zeughauskeller',
-      'lat': 47.3699,
-      'lng': 8.5391,
-      'description': 'Historic Swiss restaurant with traditional food'
-    },
-    {
-      'name': 'Kronenhalle',
-      'lat': 47.3668,
-      'lng': 8.5468,
-      'description': 'Upscale dining with art-covered walls'
-    },
-    {
-      'name': 'Sternen Grill',
-      'lat': 47.3666,
-      'lng': 8.5457,
-      'description': 'Famous for its bratwurst'
-    },
-    {
-      'name': 'Café Sprüngli',
-      'lat': 47.3697,
-      'lng': 8.5389,
-      'description': 'Luxury confectionery and chocolate'
-    },
-  ];
+  @override
+  void didUpdateWidget(MapWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the chosen city changes, update the map center
+    if (widget.chosenCity != oldWidget.chosenCity &&
+        widget.chosenCity != 'Choose your city') {
+      _centerOnChosenCity();
+    }
+  }
 
-  void _centerOnZurich() {
-    _mapController.move(const LatLng(zurichLat, zurichLng), 13);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // When the widget is first built, try to center on the chosen city
+    if (_isInitialLoad && widget.chosenCity != 'Choose your city') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _centerOnChosenCity();
+      });
+      _isInitialLoad = false;
+    }
+  }
+
+  void _centerOnChosenCity() async {
+    if (widget.chosenCity == 'Choose your city') return;
+
+    final citiesAsync = ref.read(citiesNotifierProvider);
+
+    citiesAsync.whenData((cities) {
+      // Find the chosen city in the list
+      final chosenCityData = cities.firstWhere(
+        (city) => city['name'] == widget.chosenCity,
+        orElse: () =>
+            {'name': widget.chosenCity, 'latitude': null, 'longitude': null},
+      );
+
+      // Check if we have coordinates for the chosen city
+      if (chosenCityData['latitude'] != null &&
+          chosenCityData['longitude'] != null) {
+        final lat = double.parse(chosenCityData['latitude'].toString());
+        final lng = double.parse(chosenCityData['longitude'].toString());
+        _mapController.move(LatLng(lat, lng), _currentZoom);
+      } else {
+        // If city doesn't have coordinates, try to filter restaurants by city name
+        final restaurantsAsync = ref.read(restaurantsNotifierProvider);
+        restaurantsAsync.whenData((restaurants) {
+          final cityRestaurants = restaurants
+              .where((r) =>
+                  r['address'] != null &&
+                  r['address'].toString().contains(widget.chosenCity))
+              .toList();
+
+          if (cityRestaurants.isNotEmpty &&
+              cityRestaurants[0]['latitude'] != null &&
+              cityRestaurants[0]['longitude'] != null) {
+            final lat = double.parse(cityRestaurants[0]['latitude'].toString());
+            final lng =
+                double.parse(cityRestaurants[0]['longitude'].toString());
+            _mapController.move(LatLng(lat, lng), _currentZoom);
+          }
+        });
+      }
+    });
+  }
+
+  void _centerOnDefault() {
+    _mapController.move(const LatLng(zurichLat, zurichLng), _currentZoom);
   }
 
   void _zoomIn() {
@@ -78,108 +114,172 @@ class _MapWidgetState extends State<MapWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: const LatLng(zurichLat, zurichLng),
-              initialZoom: 13,
-              onTap: (_, __) {
-                // Close any open popups when tapping on the map
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.dine_deals',
-                maxZoom: 19,
-              ),
-              MarkerLayer(
-                markers: _restaurants.map((restaurant) {
-                  return Marker(
-                    width: 80.0,
-                    height: 80.0,
-                    point: LatLng(restaurant['lat'], restaurant['lng']),
-                    child: GestureDetector(
-                      onTap: () {
-                        if (widget.onMarkerTapped != null) {
-                          widget.onMarkerTapped!(restaurant['name']);
-                        }
+    // Watch the restaurants provider
+    final restaurantsAsync = ref.watch(restaurantsNotifierProvider);
 
-                        // Show a popup with restaurant info
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text(restaurant['name']),
-                            content: Text(restaurant['description']),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: const Text('Close'),
+    // Filter restaurants by chosen city if a city is selected
+    final filteredRestaurantsAsync = restaurantsAsync.whenData((restaurants) {
+      if (widget.chosenCity == 'Choose your city') {
+        return restaurants;
+      } else {
+        return restaurants
+            .where((restaurant) =>
+                restaurant['address'] != null &&
+                restaurant['address'].toString().contains(widget.chosenCity))
+            .toList();
+      }
+    });
+
+    return filteredRestaurantsAsync.when(
+      data: (restaurants) {
+        return Column(
+          children: [
+            Expanded(
+              child: FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: const LatLng(zurichLat, zurichLng),
+                  initialZoom: _currentZoom,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.dinedeal.app',
+                    maxZoom: 19,
+                  ),
+                  MarkerLayer(
+                    markers: restaurants.map((restaurant) {
+                      // Extract coordinates from restaurant data
+                      final double lat = restaurant['latitude'] != null
+                          ? double.parse(restaurant['latitude'].toString())
+                          : zurichLat;
+
+                      final double lng = restaurant['longitude'] != null
+                          ? double.parse(restaurant['longitude'].toString())
+                          : zurichLng;
+
+                      final String name =
+                          restaurant['name'] ?? 'Unnamed Restaurant';
+                      final String address =
+                          restaurant['address'] ?? 'No address';
+
+                      return Marker(
+                        width: 120.0,
+                        height: 60.0,
+                        point: LatLng(lat, lng),
+                        child: GestureDetector(
+                          onTap: () {
+                            if (widget.onMarkerTapped != null) {
+                              widget.onMarkerTapped!(name);
+                            }
+
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text(name),
+                                content: Text(address),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
+                                    child: const Text('Close'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          child: Column(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                child: Text(
+                                  name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const Icon(
+                                Icons.location_pin,
+                                color: Colors.red,
+                                size: 30,
                               ),
                             ],
                           ),
-                        );
-                      },
-                      child: Column(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
-                            child: Text(
-                              restaurant['name'],
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const Icon(
-                            Icons.location_pin,
-                            color: Colors.red,
-                            size: 30,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            Container(
+              color: Colors.grey[100],
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Center button changes based on chosen city
+                  ElevatedButton.icon(
+                    onPressed: widget.chosenCity != 'Choose your city'
+                        ? _centerOnChosenCity
+                        : _centerOnDefault,
+                    icon: const Icon(Icons.location_searching),
+                    label: Text(widget.chosenCity != 'Choose your city'
+                        ? 'Center on ${widget.chosenCity}'
+                        : 'Default View'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      FloatingActionButton.small(
+                        heroTag: 'zoom_in',
+                        onPressed: _zoomIn,
+                        child: const Icon(Icons.add),
+                      ),
+                      const SizedBox(width: 8),
+                      FloatingActionButton.small(
+                        heroTag: 'zoom_out',
+                        onPressed: _zoomOut,
+                        child: const Icon(Icons.remove),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Error loading restaurants: $error'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.refresh(restaurantsNotifierProvider),
+              child: const Text('Try Again'),
+            ),
+          ],
         ),
-        // Container(
-        //   height: 60,
-        //   padding: const EdgeInsets.symmetric(horizontal: 16),
-        //   child: Row(
-        //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        //     children: [
-        //       ElevatedButton(
-        //         onPressed: _centerOnZurich,
-        //         child: const Text('Center on Zurich'),
-        //       ),
-        //       ElevatedButton(
-        //         onPressed: _zoomIn,
-        //         child: const Text('Zoom In'),
-        //       ),
-        //       ElevatedButton(
-        //         onPressed: _zoomOut,
-        //         child: const Text('Zoom Out'),
-        //       ),
-        //     ],
-        //   ),
-        // ),
-      ],
+      ),
     );
   }
 }

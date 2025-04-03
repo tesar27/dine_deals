@@ -1,3 +1,4 @@
+import 'package:dine_deals/src/widgets/map_screen.dart';
 import 'package:flutter/material.dart';
 
 class RestaurantsPage extends StatelessWidget {
@@ -5,9 +6,18 @@ class RestaurantsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
+    return Scaffold(
+      body: const Center(
         child: Text('This is the restaurans page'),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const MapScreen()),
+          );
+        },
+        child: const Icon(Icons.map),
       ),
     );
   }
