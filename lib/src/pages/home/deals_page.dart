@@ -1,12 +1,12 @@
+import 'package:dine_deals/src/providers/cities_provider.dart';
 import 'package:dine_deals/src/widgets/food_categories.dart';
 import 'package:dine_deals/src/widgets/hero_carousel.dart';
 import 'package:dine_deals/src/widgets/offers_list.dart';
 import 'package:dine_deals/src/widgets/map_widget.dart';
 import 'package:flutter/material.dart';
-// import 'package:flutter/foundation.dart'
-// show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class DealsPage extends StatefulWidget {
+class DealsPage extends ConsumerStatefulWidget {
   const DealsPage({super.key});
 
   @override
@@ -14,58 +14,34 @@ class DealsPage extends StatefulWidget {
   _DealsPageState createState() => _DealsPageState();
 }
 
-class _DealsPageState extends State<DealsPage> {
+class _DealsPageState extends ConsumerState<DealsPage> {
   String _chosenCity = 'Choose your city';
   bool _iconTapped = false;
   bool _isMapView = false;
 
-  final List<String> _cities = [
-    'Zurich',
-    'Geneva',
-    'Basel',
-    'Lausanne',
-    'Bern',
-    'Winterthur',
-    'Lucerne',
-    'St. Gallen',
-    'Lugano',
-    'Biel/Bienne',
-    'Thun',
-    'Köniz',
-    'La Chaux-de-Fonds',
-    'Schaffhausen',
-    'Fribourg',
-    'Chur',
-    'Neuchâtel',
-    'Vernier',
-    'Sion',
-    'Uster'
-  ];
-
-  void _showCitiesList() {
+  void _showCitiesList(List<String> cities) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (BuildContext context) {
         return Padding(
-          padding: const EdgeInsets.only(top: 16.0), // Add padding on the top
+          padding: const EdgeInsets.only(top: 16.0),
           child: SizedBox(
-            height: MediaQuery.of(context).size.height *
-                0.92, // Adjust the height as needed
+            height: MediaQuery.of(context).size.height * 0.92,
             child: ListView.builder(
-              itemCount: _cities.length,
+              itemCount: cities.length,
               itemBuilder: (BuildContext context, int index) {
                 return ListTile(
                   title: Text(
-                    _cities[index],
+                    cities[index],
                     style: const TextStyle(
-                      fontSize: 18, // Change the font size
-                      fontWeight: FontWeight.bold, // Change the font weight
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   onTap: () {
                     setState(() {
-                      _chosenCity = _cities[index];
+                      _chosenCity = cities[index];
                       _iconTapped = false;
                     });
                     Navigator.pop(context);
@@ -81,6 +57,8 @@ class _DealsPageState extends State<DealsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final citiesAsync = ref.watch(citiesNotifierProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: Align(
@@ -97,7 +75,18 @@ class _DealsPageState extends State<DealsPage> {
                   setState(() {
                     _iconTapped = false;
                   });
-                  _showCitiesList();
+                  citiesAsync.when(
+                    data: (cities) => _showCitiesList(
+                      cities.map((city) => city['name'] as String).toList(),
+                    ),
+                    loading: () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Loading cities...')),
+                    ),
+                    error: (error, stack) =>
+                        ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $error')),
+                    ),
+                  );
                 },
                 onTapCancel: () {
                   setState(() {
