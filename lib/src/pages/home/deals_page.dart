@@ -1,4 +1,5 @@
 import 'package:dine_deals/src/providers/cities_provider.dart';
+import 'package:dine_deals/src/providers/location_provider.dart';
 import 'package:dine_deals/src/widgets/food_categories.dart';
 import 'package:dine_deals/src/widgets/hero_carousel.dart';
 import 'package:dine_deals/src/widgets/offers_list.dart';
@@ -18,6 +19,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
   String _chosenCity = 'Choose your city';
   bool _iconTapped = false;
   bool _isMapView = false;
+  late final locationAsync;
 
   void _showCitiesList(List<String> cities) {
     showModalBottomSheet(
@@ -57,6 +59,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
   @override
   Widget build(BuildContext context) {
+    locationAsync = ref.watch(locationNotifierProvider);
     final citiesAsync = ref.watch(citiesNotifierProvider);
 
     return Scaffold(
@@ -135,59 +138,98 @@ class _DealsPageState extends ConsumerState<DealsPage> {
             bottom: 16,
             left: 16,
             right: 16,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isMapView = false;
-                    });
-                  },
+                // Center toggle buttons
+                Align(
+                  alignment: Alignment.center,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        vertical: 12, horizontal: 24),
-                    decoration: BoxDecoration(
-                      color: _isMapView ? Colors.grey[300] : Colors.grey[700],
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(30),
-                        bottomLeft: Radius.circular(30),
-                      ),
-                    ),
-                    child: Text(
-                      'List',
-                      style: TextStyle(
-                        color: _isMapView ? Colors.black : Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                        horizontal: 40), // Add padding to center
+                    child: Row(
+                      mainAxisSize:
+                          MainAxisSize.min, // Make row take minimum space
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isMapView = false;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 12, horizontal: 24),
+                            decoration: BoxDecoration(
+                              color: _isMapView
+                                  ? Colors.grey[300]
+                                  : Colors.grey[700],
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(30),
+                                bottomLeft: Radius.circular(30),
+                              ),
+                            ),
+                            child: Text(
+                              'List',
+                              style: TextStyle(
+                                color: _isMapView ? Colors.black : Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isMapView = true;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 12, horizontal: 24),
+                            decoration: BoxDecoration(
+                              color: _isMapView
+                                  ? Colors.grey[700]
+                                  : Colors.grey[300],
+                              borderRadius: const BorderRadius.only(
+                                topRight: Radius.circular(30),
+                                bottomRight: Radius.circular(30),
+                              ),
+                            ),
+                            child: Text(
+                              'Map',
+                              style: TextStyle(
+                                color: _isMapView ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isMapView = true;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 12, horizontal: 24),
-                    decoration: BoxDecoration(
-                      color: _isMapView ? Colors.grey[700] : Colors.grey[300],
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(30),
-                        bottomRight: Radius.circular(30),
-                      ),
-                    ),
-                    child: Text(
-                      'Map',
-                      style: TextStyle(
-                        color: _isMapView ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.bold,
+
+                // Right aligned button
+                if (_isMapView)
+                  Positioned(
+                    right: 0,
+                    child: FloatingActionButton(
+                      heroTag: 'locate_me',
+                      mini: true,
+                      shape: const CircleBorder(),
+                      backgroundColor: Colors.blue,
+                      elevation: 0, // Remove shadow
+                      onPressed: () {
+                        // Handle location functionality
+                      },
+                      child: Transform.rotate(
+                        angle: 45 * 3.14159 / 180, // 45 degrees in radians
+                        child:
+                            const Icon(Icons.navigation, color: Colors.white),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

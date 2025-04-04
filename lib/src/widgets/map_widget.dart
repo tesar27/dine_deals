@@ -217,7 +217,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                       // --- Attribution Layer (Very Important!) ---
                       // You MUST attribute the map data source (OSM) and the tile provider (CARTO)
                       const RichAttributionWidget(
-                        popupInitialDisplayDuration: Duration(seconds: 5),
+                        alignment: AttributionAlignment
+                            .bottomLeft, // Position at the bottom left
+                        // popupInitialDisplayDuration: Duration(seconds: 5),
                         animationConfig: ScaleRAWA(), // Optional nice animation
                         attributions: [
                           TextSourceAttribution(
@@ -237,44 +239,44 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                 ],
               ),
             ),
-            Container(
-              color: Colors.grey[100],
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Center button changes based on chosen city
-                  ElevatedButton.icon(
-                    onPressed: widget.chosenCity != 'Choose your city'
-                        ? _centerOnChosenCity
-                        : _centerOnDefault,
-                    icon: const Icon(Icons.location_searching),
-                    label: Text(widget.chosenCity != 'Choose your city'
-                        ? 'Center on ${widget.chosenCity}'
-                        : 'Default View'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      FloatingActionButton.small(
-                        heroTag: 'zoom_in',
-                        onPressed: _zoomIn,
-                        child: const Icon(Icons.add),
-                      ),
-                      const SizedBox(width: 8),
-                      FloatingActionButton.small(
-                        heroTag: 'zoom_out',
-                        onPressed: _zoomOut,
-                        child: const Icon(Icons.remove),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            // Container(
+            //   color: Colors.grey[100],
+            //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            //   child: Row(
+            //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            //     children: [
+            //       // Center button changes based on chosen city
+            //       ElevatedButton.icon(
+            //         onPressed: widget.chosenCity != 'Choose your city'
+            //             ? _centerOnChosenCity
+            //             : _centerOnDefault,
+            //         icon: const Icon(Icons.location_searching),
+            //         label: Text(widget.chosenCity != 'Choose your city'
+            //             ? 'Center on ${widget.chosenCity}'
+            //             : 'Default View'),
+            //         style: ElevatedButton.styleFrom(
+            //           backgroundColor: Colors.blue,
+            //           foregroundColor: Colors.white,
+            //         ),
+            //       ),
+            //       Row(
+            //         children: [
+            //           FloatingActionButton.small(
+            //             heroTag: 'zoom_in',
+            //             onPressed: _zoomIn,
+            //             child: const Icon(Icons.add),
+            //           ),
+            //           const SizedBox(width: 8),
+            //           FloatingActionButton.small(
+            //             heroTag: 'zoom_out',
+            //             onPressed: _zoomOut,
+            //             child: const Icon(Icons.remove),
+            //           ),
+            //         ],
+            //       ),
+            //     ],
+            //   ),
+            // ),
           ],
         );
       },
