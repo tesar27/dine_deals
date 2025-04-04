@@ -19,7 +19,9 @@ class LocationNotifier extends _$LocationNotifier {
 
     // Get current position
     return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
+      locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 10)),
+    );
   }
 
   Future<void> refreshLocation() async {

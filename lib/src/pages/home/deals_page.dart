@@ -1,5 +1,4 @@
 import 'package:dine_deals/src/providers/cities_provider.dart';
-import 'package:dine_deals/src/providers/location_provider.dart';
 import 'package:dine_deals/src/widgets/food_categories.dart';
 import 'package:dine_deals/src/widgets/hero_carousel.dart';
 import 'package:dine_deals/src/widgets/offers_list.dart';
@@ -19,7 +18,6 @@ class _DealsPageState extends ConsumerState<DealsPage> {
   String _chosenCity = 'Choose your city';
   bool _iconTapped = false;
   bool _isMapView = false;
-  late final locationAsync;
 
   void _showCitiesList(List<String> cities) {
     showModalBottomSheet(
@@ -59,7 +57,6 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
   @override
   Widget build(BuildContext context) {
-    locationAsync = ref.watch(locationNotifierProvider);
     final citiesAsync = ref.watch(citiesNotifierProvider);
 
     return Scaffold(
@@ -211,25 +208,72 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                 ),
 
                 // Right aligned button
-                if (_isMapView)
-                  Positioned(
-                    right: 0,
-                    child: FloatingActionButton(
-                      heroTag: 'locate_me',
-                      mini: true,
-                      shape: const CircleBorder(),
-                      backgroundColor: Colors.blue,
-                      elevation: 0, // Remove shadow
-                      onPressed: () {
-                        // Handle location functionality
-                      },
-                      child: Transform.rotate(
-                        angle: 45 * 3.14159 / 180, // 45 degrees in radians
-                        child:
-                            const Icon(Icons.navigation, color: Colors.white),
-                      ),
-                    ),
-                  ),
+                // if (_isMapView)
+                //   Positioned(
+                //     right: 0,
+                //     child: FloatingActionButton(
+                //       heroTag: 'locate_me',
+                //       mini: true,
+                //       shape: const CircleBorder(),
+                //       backgroundColor: Colors.blue,
+                //       elevation: 0, // Remove shadow
+                //       onPressed: () async {
+                //         try {
+                //           // Show a loading message
+                //           ScaffoldMessenger.of(context).showSnackBar(
+                //             const SnackBar(
+                //                 content: Text('Fetching location...')),
+                //           );
+
+                //           // Get location
+                //           final position = await Geolocator.getCurrentPosition(
+                //             locationSettings: const LocationSettings(
+                //               accuracy: LocationAccuracy.high,
+                //             ),
+                //           );
+
+                //           // Get map controller
+                //           final mapController = ref.read(mapControllerProvider);
+                //           print('Map controller: $mapController');
+                //           print(
+                //               'Location: ${position.latitude}, ${position.longitude}');
+
+                //           // Move map to user location
+                //           // Create LatLng object from position
+                //           final latLng =
+                //               LatLng(position.latitude, position.longitude);
+
+                //           // Use a microtask to ensure UI updates after current execution
+                //           Future.microtask(() {
+                //             if (mapController != null) {
+                //               mapController.move(latLng, 15.0);
+                //             }
+                //             print('Map moved to: $latLng');
+
+                //             // Show success message
+                //             ScaffoldMessenger.of(context).showSnackBar(
+                //               const SnackBar(
+                //                   content: Text('Centered on your location')),
+                //             );
+                //           });
+                //         } catch (e) {
+                //           // Show error message
+                //           print('Location error: $e');
+                //           ScaffoldMessenger.of(context).showSnackBar(
+                //             SnackBar(
+                //               content: Text('Error: $e'),
+                //               backgroundColor: Colors.red,
+                //             ),
+                //           );
+                //         }
+                //       },
+                //       child: Transform.rotate(
+                //         angle: 45 * 3.14159 / 180, // 45 degrees in radians
+                //         child:
+                //             const Icon(Icons.navigation, color: Colors.white),
+                //       ),
+                //     ),
+                //   ),
               ],
             ),
           ),

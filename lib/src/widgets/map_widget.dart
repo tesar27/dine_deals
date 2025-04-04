@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:dine_deals/src/providers/restaurants_provider.dart';
 import 'package:dine_deals/src/providers/cities_provider.dart';
@@ -20,11 +21,13 @@ class MapWidget extends ConsumerStatefulWidget {
 }
 
 class _MapWidgetState extends ConsumerState<MapWidget> {
-  final MapController _mapController = MapController();
+  // final MapController _mapController = MapController();
 
   // Default Zurich coordinates
   static const double zurichLat = 47.3769;
   static const double zurichLng = 8.5417;
+
+  final _mapController = MapController(); // Create local instance
 
   // Default zoom level
   double _currentZoom = 13.0;
@@ -54,7 +57,6 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
   void _centerOnChosenCity() async {
     if (widget.chosenCity == 'Choose your city') return;
-
     final citiesAsync = ref.read(citiesNotifierProvider);
 
     citiesAsync.whenData((cities) {
@@ -159,6 +161,8 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                         // IMPORTANT: Replace with your actual package name
                         userAgentPackageName: 'com.dinedeals.app',
                         // tileProvider: CachedTileProvider(), // Optional: Enables caching tiles locally
+                        retinaMode:
+                            MediaQuery.of(context).devicePixelRatio > 1.0,
                       ),
                       MarkerLayer(
                         markers: restaurants.map((restaurant) {
@@ -236,47 +240,99 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                       ),
                     ],
                   ),
+                  // Add the Locate Me button
+                  Positioned(
+                    right: 16,
+                    bottom: 20, // Position above the controls container
+                    child: FloatingActionButton(
+                      heroTag: 'locate_me',
+                      mini: true,
+                      shape: const CircleBorder(),
+                      backgroundColor: Colors.blue,
+                      elevation: 0,
+                      onPressed: () async {
+                        try {
+                          // Show a loading message
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Fetching location...')),
+                          );
+
+                          // Get location
+                          final position = await Geolocator.getCurrentPosition(
+                            locationSettings: const LocationSettings(
+                              accuracy: LocationAccuracy.high,
+                            ),
+                          );
+                          print('Current position: $position');
+                          // Move map to user location
+                          final latLng =
+                              LatLng(position.latitude, position.longitude);
+                          _mapController.move(latLng, 15.0);
+
+                          // Show success message
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Centered on your location')),
+                          );
+                        } catch (e) {
+                          // Show error message
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      child: Transform.rotate(
+                        angle: 45 * 3.14159 / 180,
+                        child:
+                            const Icon(Icons.navigation, color: Colors.white),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            // Container(
-            //   color: Colors.grey[100],
-            //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            //   child: Row(
-            //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            //     children: [
-            //       // Center button changes based on chosen city
-            //       ElevatedButton.icon(
-            //         onPressed: widget.chosenCity != 'Choose your city'
-            //             ? _centerOnChosenCity
-            //             : _centerOnDefault,
-            //         icon: const Icon(Icons.location_searching),
-            //         label: Text(widget.chosenCity != 'Choose your city'
-            //             ? 'Center on ${widget.chosenCity}'
-            //             : 'Default View'),
-            //         style: ElevatedButton.styleFrom(
-            //           backgroundColor: Colors.blue,
-            //           foregroundColor: Colors.white,
-            //         ),
-            //       ),
-            //       Row(
-            //         children: [
-            //           FloatingActionButton.small(
-            //             heroTag: 'zoom_in',
-            //             onPressed: _zoomIn,
-            //             child: const Icon(Icons.add),
-            //           ),
-            //           const SizedBox(width: 8),
-            //           FloatingActionButton.small(
-            //             heroTag: 'zoom_out',
-            //             onPressed: _zoomOut,
-            //             child: const Icon(Icons.remove),
-            //           ),
-            //         ],
-            //       ),
-            //     ],
-            //   ),
-            // ),
+            Container(
+              color: Colors.grey[100],
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Center button changes based on chosen city
+                  ElevatedButton.icon(
+                    onPressed: widget.chosenCity != 'Choose your city'
+                        ? _centerOnChosenCity
+                        : _centerOnDefault,
+                    icon: const Icon(Icons.location_searching),
+                    label: Text(widget.chosenCity != 'Choose your city'
+                        ? 'Center on ${widget.chosenCity}'
+                        : 'Default View'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      FloatingActionButton.small(
+                        heroTag: 'zoom_in',
+                        onPressed: _zoomIn,
+                        child: const Icon(Icons.add),
+                      ),
+                      const SizedBox(width: 8),
+                      FloatingActionButton.small(
+                        heroTag: 'zoom_out',
+                        onPressed: _zoomOut,
+                        child: const Icon(Icons.remove),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         );
       },
