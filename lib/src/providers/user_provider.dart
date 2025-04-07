@@ -39,6 +39,13 @@ class UserNotifier extends _$UserNotifier {
       throw Exception('An unexpected error occurred while fetching user data.');
     }
   }
+
+  // Method to refresh the fetching
+  Future<void> refresh() async {
+    state = const AsyncValue.loading(); // Set the state to loading
+    state =
+        await AsyncValue.guard(() => build()); // Re-trigger the build method
+  }
 }
 
 extension on PostgrestMap {}

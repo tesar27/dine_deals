@@ -22,7 +22,9 @@ class MapWidget extends ConsumerStatefulWidget {
 
 class _MapWidgetState extends ConsumerState<MapWidget> {
   // final MapController _mapController = MapController();
-
+  // Add these state variables at the start of your _MapWidgetState class
+  LatLng? _userLocation;
+  bool _showUserLocation = false;
   // Default Zurich coordinates
   static const double zurichLat = 47.3769;
   static const double zurichLng = 8.5417;
@@ -164,6 +166,28 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                         retinaMode:
                             MediaQuery.of(context).devicePixelRatio > 1.0,
                       ),
+                      // Add this CircleLayer for the user's location
+                      if (_showUserLocation && _userLocation != null)
+                        CircleLayer(
+                          circles: [
+                            CircleMarker(
+                              point: _userLocation!,
+                              radius: 10,
+                              color: Colors.blue
+                                  .withOpacity(0.7), // Inner blue circle
+                              borderColor: Colors.white,
+                              borderStrokeWidth: 2,
+                              useRadiusInMeter: false,
+                            ),
+                            CircleMarker(
+                              point: _userLocation!,
+                              radius: 30,
+                              color: Colors.blue
+                                  .withOpacity(0.2), // Outer blue circle
+                              useRadiusInMeter: false,
+                            ),
+                          ],
+                        ),
                       MarkerLayer(
                         markers: restaurants.map((restaurant) {
                           // Extract coordinates from restaurant data
@@ -252,29 +276,20 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                       elevation: 0,
                       onPressed: () async {
                         try {
-                          // Show a loading message
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Fetching location...')),
-                          );
-
                           // Get location
                           final position = await Geolocator.getCurrentPosition(
                             locationSettings: const LocationSettings(
                               accuracy: LocationAccuracy.high,
                             ),
                           );
-                          print('Current position: $position');
+                          // Update state to show user location
+                          setState(() {
+                            _userLocation =
+                                LatLng(position.latitude, position.longitude);
+                            _showUserLocation = true;
+                          });
                           // Move map to user location
-                          final latLng =
-                              LatLng(position.latitude, position.longitude);
-                          _mapController.move(latLng, 15.0);
-
-                          // Show success message
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Centered on your location')),
-                          );
+                          _mapController.move(_userLocation!, 15.0);
                         } catch (e) {
                           // Show error message
                           ScaffoldMessenger.of(context).showSnackBar(
