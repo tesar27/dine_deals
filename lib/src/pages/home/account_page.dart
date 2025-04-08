@@ -1,3 +1,4 @@
+import 'package:dine_deals/src/pages/home/admin_page.dart';
 import 'package:dine_deals/src/providers/theme_provider.dart';
 import 'package:dine_deals/src/providers/user_provider.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   String _firstName = '';
   String _lastName = '';
   String _email = '';
+  String isSuperAdmin = 'false';
 
   // Stats for the pie chart
   final Map<String, int> _stats = {
@@ -47,7 +49,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
         setState(() {
           _email = user['email'] ?? '';
           _avatarUrl = user['avatar_url'];
-
+          isSuperAdmin = user['is_super_admin']?.toString() ?? 'false';
           // Split email to create a name if not available
           final nameParts =
               user['name']?.split(' ') ?? _email.split('@')[0].split('.');
@@ -272,7 +274,21 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                         },
                       ),
                     ),
-
+                    _buildSettingsItem(
+                      icon: Icons.admin_panel_settings,
+                      title: 'Admin Panel',
+                      onTap: () {
+                        if (isSuperAdmin == 'true') {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const AdminPage()),
+                          );
+                        } else {
+                          context.showSnackBar('You do not have admin access');
+                        }
+                      },
+                      isDestructive: true,
+                    ),
                     // Full theme selector
                     // ListTile(
                     //   leading: const Icon(Icons.settings_brightness),
