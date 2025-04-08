@@ -3,7 +3,6 @@ import 'package:dine_deals/src/pages/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/main.dart';
-import 'package:dine_deals/src/pages/home/account_page.dart';
 
 class OtpSignupPage extends StatefulWidget {
   const OtpSignupPage({super.key});

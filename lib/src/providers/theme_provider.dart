@@ -1,95 +1,57 @@
 // lib/src/providers/theme_provider.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-part 'theme_provider.g.dart';
+// Simple state provider for theme mode
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>(
+  (ref) => ThemeModeNotifier(),
+);
 
-enum AppThemeMode {
-  light,
-  dark,
-  system,
-}
+// Notifier to handle theme state with persistence
+class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  ThemeModeNotifier() : super(ThemeMode.system) {
+    _loadSavedTheme();
+  }
 
-@riverpod
-class ThemeNotifier extends _$ThemeNotifier {
   static const _themePreferenceKey = 'theme_mode';
 
-  @override
-  Future<ThemeMode> build() async {
+  // Load saved theme from preferences
+  Future<void> _loadSavedTheme() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedTheme = prefs.getString(_themePreferenceKey);
+    final themeName = prefs.getString(_themePreferenceKey);
 
-    AppThemeMode appMode = savedTheme == null
-        ? AppThemeMode.system
-        : AppThemeMode.values.firstWhere((e) => e.name == savedTheme,
-            orElse: () => AppThemeMode.system);
-
-    return _convertToThemeMode(appMode);
+    if (themeName != null) {
+      state = ThemeMode.values.firstWhere(
+        (e) => e.name == themeName,
+        orElse: () => ThemeMode.system,
+      );
+    }
   }
 
-  ThemeMode _convertToThemeMode(AppThemeMode mode) {
-    return switch (mode) {
-      AppThemeMode.light => ThemeMode.light,
-      AppThemeMode.dark => ThemeMode.dark,
-      AppThemeMode.system => ThemeMode.system,
-    };
-  }
-
-  Future<void> setThemeMode(AppThemeMode mode) async {
+  // Change theme and save preference
+  Future<void> setThemeMode(ThemeMode mode) async {
+    state = mode;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_themePreferenceKey, mode.name);
-    state = AsyncData(_convertToThemeMode(mode));
   }
 
-  ThemeMode getFlutterThemeMode() {
-    return state.valueOrNull ?? ThemeMode.system;
+  // Toggle between light and dark
+  void toggleTheme() {
+    setThemeMode(state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
   }
 }
 
-@riverpod
-ThemeData themeData(Ref ref, Brightness brightness) {
+// Theme data provider
+final themeDataProvider =
+    Provider.family<ThemeData, Brightness>((ref, brightness) {
   final isLight = brightness == Brightness.light;
 
-  // Set base colors
+  // Colors
   final backgroundColor = isLight ? Colors.white : const Color(0xFF121212);
   final textColor = isLight ? Colors.black : Colors.white;
   final primaryColor = isLight ? Colors.black : const Color(0xFF5FB709);
   const secondaryColor = Color(0xFF5FB709);
-
-  // Create a single consistent text theme to avoid interpolation issues
-  final textTheme = TextTheme(
-    // All TextStyles have the same inherit value
-    bodyLarge: TextStyle(
-      inherit: true,
-      color: textColor,
-      fontSize: 16,
-    ),
-    bodyMedium: TextStyle(
-      inherit: true,
-      color: textColor,
-      fontSize: 14,
-    ),
-    titleLarge: TextStyle(
-      inherit: true,
-      color: textColor,
-      fontSize: 18,
-      fontWeight: FontWeight.bold,
-    ),
-    titleMedium: TextStyle(
-      inherit: true,
-      color: textColor,
-      fontSize: 16,
-      fontWeight: FontWeight.w500,
-    ),
-    labelLarge: TextStyle(
-      inherit: true,
-      color: textColor,
-      fontSize: 16,
-      fontWeight: FontWeight.w500,
-    ),
-  );
 
   return ThemeData(
     useMaterial3: true,
@@ -98,7 +60,6 @@ ThemeData themeData(Ref ref, Brightness brightness) {
     primaryColor: primaryColor,
     scaffoldBackgroundColor: backgroundColor,
 
-    // Set consistent color scheme
     colorScheme: ColorScheme(
       brightness: brightness,
       primary: primaryColor,
@@ -107,25 +68,30 @@ ThemeData themeData(Ref ref, Brightness brightness) {
       onSecondary: Colors.white,
       error: isLight ? Colors.red : const Color(0xFFCF6679),
       onError: isLight ? Colors.white : Colors.black,
+      background: backgroundColor,
+      onBackground: textColor,
       surface: backgroundColor,
       onSurface: textColor,
     ),
 
-    // Use the consistent text theme
-    textTheme: textTheme,
+    // Keep TextStyle consistent
+    textTheme: TextTheme(
+      bodyLarge: TextStyle(color: textColor, fontSize: 16),
+      bodyMedium: TextStyle(color: textColor, fontSize: 14),
+      titleLarge: TextStyle(
+          color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+      titleMedium: TextStyle(
+          color: textColor, fontSize: 16, fontWeight: FontWeight.w500),
+    ).apply(fontFamily: 'SF Pro Display'),
 
-    // Button themes
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ButtonStyle(
-        backgroundColor: WidgetStateProperty.all(primaryColor),
+        backgroundColor: MaterialStateProperty.all(primaryColor),
         foregroundColor:
-            WidgetStateProperty.all(isLight ? Colors.white : Colors.black),
-        padding: WidgetStateProperty.all(
+            MaterialStateProperty.all(isLight ? Colors.white : Colors.black),
+        padding: MaterialStateProperty.all(
             const EdgeInsets.symmetric(vertical: 12, horizontal: 24)),
-        shape: WidgetStateProperty.all(RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        )),
       ),
     ),
   );
-}
+});

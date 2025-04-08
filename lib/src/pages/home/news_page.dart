@@ -18,7 +18,7 @@ class NewsPage extends StatelessWidget {
           _buildCard(
             title: 'Exciting Updates in the Food World!',
             subtitle: 'Discover the latest trends and news in dining.',
-            imageUrl: 'https://via.placeholder.com/150',
+            imageUrl: 'https://placehold.co/150',
           ),
           _buildSectionTitle('New Offers'),
           _buildCard(
@@ -70,11 +70,13 @@ class NewsPage extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: Image.network(
-              imageUrl,
+            child: Container(
               height: 150,
               width: double.infinity,
-              fit: BoxFit.cover,
+              color: Colors.grey[300],
+              child: const Center(
+                child: Icon(Icons.image, size: 40, color: Colors.grey),
+              ),
             ),
           ),
           Padding(

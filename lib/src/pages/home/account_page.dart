@@ -22,7 +22,6 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   String _firstName = '';
   String _lastName = '';
   String _email = '';
-  String _phone = '';
 
   // Stats for the pie chart
   final Map<String, int> _stats = {
@@ -42,11 +41,11 @@ class _AccountPageState extends ConsumerState<AccountPage> {
 
   void _initializeProfile() {
     final userAsync = ref.read(userNotifierProvider);
+    print('userAsync: $userAsync');
     userAsync.whenData((user) {
       if (user != null) {
         setState(() {
           _email = user['email'] ?? '';
-          _phone = user['phone'] ?? '';
           _avatarUrl = user['avatar_url'];
 
           // Split email to create a name if not available
@@ -84,7 +83,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(userNotifierProvider);
-    final themeMode = ref.watch(themeNotifierProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return Scaffold(
       body: userAsync.when(
@@ -256,6 +255,54 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                       onTap: _signOut,
                       isDestructive: true,
                     ),
+
+                    // Theme toggle with icon
+                    ListTile(
+                      leading: Icon(themeMode == ThemeMode.dark
+                          ? Icons.light_mode
+                          : Icons.dark_mode),
+                      title: const Text('Appearance'),
+                      subtitle: Text(themeMode == ThemeMode.dark
+                          ? 'Dark Mode'
+                          : 'Light Mode'),
+                      trailing: Switch(
+                        value: themeMode == ThemeMode.dark,
+                        onChanged: (_) {
+                          ref.read(themeModeProvider.notifier).toggleTheme();
+                        },
+                      ),
+                    ),
+
+                    // Full theme selector
+                    // ListTile(
+                    //   leading: const Icon(Icons.settings_brightness),
+                    //   title: const Text('Theme Mode'),
+                    //   trailing: DropdownButton<ThemeMode>(
+                    //     value: themeMode,
+                    //     underline: const SizedBox(),
+                    //     onChanged: (ThemeMode? newMode) {
+                    //       if (newMode != null) {
+                    //         ref
+                    //             .read(themeModeProvider.notifier)
+                    //             .setThemeMode(newMode);
+                    //       }
+                    //     },
+                    //     items: const [
+                    //       DropdownMenuItem(
+                    //         value: ThemeMode.system,
+                    //         child: Text('System'),
+                    //       ),
+                    //       DropdownMenuItem(
+                    //         value: ThemeMode.light,
+                    //         child: Text('Light'),
+                    //       ),
+                    //       DropdownMenuItem(
+                    //         value: ThemeMode.dark,
+                    //         child: Text('Dark'),
+                    //       ),
+                    //     ],
+                    //   ),
+                    // ),
                   ],
                 ),
               ),

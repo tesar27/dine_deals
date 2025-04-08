@@ -1,12 +1,14 @@
+import 'package:dine_deals/src/pages/auth/otp_signup_page.dart';
 import 'package:dine_deals/src/pages/home/home_page.dart';
 import 'package:dine_deals/src/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:dine_deals/src/pages/auth/otp_signup_page.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
   await Supabase.initialize(
     url: 'https://kpceyekfdauxsbljihst.supabase.co',
     anonKey:
@@ -23,38 +25,16 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeNotifierProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
-    return themeMode.when(
-      data: (mode) {
-        // Convert our custom ThemeMode enum to Flutter's ThemeMode
-        final flutterThemeMode =
-            ref.read(themeNotifierProvider.notifier).getFlutterThemeMode();
-
-        return MaterialApp(
-          title: 'Dine Deals',
-          themeMode: flutterThemeMode,
-          theme: ref.watch(themeDataProvider(Brightness.light)),
-          darkTheme: ref.watch(themeDataProvider(Brightness.dark)),
-          home: supabase.auth.currentSession == null
-              ? const OtpSignupPage()
-              : const HomePage(),
-        );
-      },
-      loading: () => const MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-      ),
-      error: (error, stackTrace) => MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Text('Error loading theme: $error'),
-          ),
-        ),
-      ),
+    return MaterialApp(
+      title: 'Dine Deals',
+      theme: ref.watch(themeDataProvider(Brightness.light)),
+      darkTheme: ref.watch(themeDataProvider(Brightness.dark)),
+      themeMode: themeMode,
+      home: supabase.auth.currentSession == null
+          ? const OtpSignupPage()
+          : const HomePage(),
     );
   }
 }
