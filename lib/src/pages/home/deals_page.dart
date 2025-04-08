@@ -2,6 +2,7 @@ import 'package:dine_deals/src/providers/cities_provider.dart';
 import 'package:dine_deals/src/widgets/map_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DealsPage extends ConsumerStatefulWidget {
   const DealsPage({super.key});
@@ -12,10 +13,35 @@ class DealsPage extends ConsumerStatefulWidget {
 }
 
 class _DealsPageState extends ConsumerState<DealsPage> {
+  static const String _cityPreferenceKey = 'chosen_city';
   String _chosenCity = 'Choose your city';
   bool _iconTapped = false;
   bool _isMapView = false;
   List<String> _selectedCategories = ["All"]; // Default to "All"
+
+  @override
+  void initState() {
+    super.initState();
+    // Load saved city when widget initializes
+    _loadSavedCity();
+  }
+
+// Load city from SharedPreferences
+  Future<void> _loadSavedCity() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedCity = prefs.getString(_cityPreferenceKey);
+    if (savedCity != null) {
+      setState(() {
+        _chosenCity = savedCity;
+      });
+    }
+  }
+
+  // Save city to SharedPreferences
+  Future<void> _saveCity(String city) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_cityPreferenceKey, city);
+  }
 
   void _showCitiesList(List<String> cities) {
     showModalBottomSheet(
@@ -46,6 +72,8 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                       _chosenCity = cities[index];
                       _iconTapped = false;
                     });
+                    // Save city when selected
+                    _saveCity(cities[index]);
                     Navigator.pop(context);
                   },
                 );
