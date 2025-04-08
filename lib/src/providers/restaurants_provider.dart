@@ -99,4 +99,125 @@ class RestaurantsNotifier extends _$RestaurantsNotifier {
       throw Exception('Failed to fetch coordinates: ${response.body}');
     }
   }
+
+  // Add this function to your RestaurantsNotifier class
+
+  /// Fetches restaurants and filters them based on provided criteria
+  /// Returns either a list of matching restaurants or a single restaurant if unique match
+  Future<dynamic> getFilteredRestaurants({
+    String? city,
+    String? country,
+    String? name,
+    String? category,
+    double? minRating,
+    double? maxPrice,
+    int? limit,
+  }) async {
+    try {
+      // First, get all restaurants (leveraging cache if available)
+      final allRestaurants = await _fetchRestaurants();
+
+      // Apply filters
+      final filteredRestaurants = allRestaurants.where((restaurant) {
+        // Check city filter
+        if (city != null && city.isNotEmpty) {
+          final restaurantCity =
+              restaurant['address']?.toString().toLowerCase() ?? '';
+          if (!restaurantCity.contains(city.toLowerCase())) {
+            return false;
+          }
+        }
+
+        // Check country filter
+        if (country != null && country.isNotEmpty) {
+          final restaurantCountry =
+              restaurant['country']?.toString().toLowerCase() ?? '';
+          if (!restaurantCountry.contains(country.toLowerCase())) {
+            return false;
+          }
+        }
+
+        // Check name filter
+        if (name != null && name.isNotEmpty) {
+          final restaurantName =
+              restaurant['name']?.toString().toLowerCase() ?? '';
+          if (!restaurantName.contains(name.toLowerCase())) {
+            return false;
+          }
+        }
+
+        // Check category filter
+        if (category != null && category.isNotEmpty && category != "All") {
+          final restaurantCategories = restaurant['categories'] ?? [];
+          // Handle both String and List cases
+          if (restaurantCategories is String) {
+            if (!restaurantCategories
+                .toLowerCase()
+                .contains(category.toLowerCase())) {
+              return false;
+            }
+          } else if (restaurantCategories is List) {
+            bool categoryFound = false;
+            for (var cat in restaurantCategories) {
+              if (cat.toString().toLowerCase() == category.toLowerCase()) {
+                categoryFound = true;
+                break;
+              }
+            }
+            if (!categoryFound) return false;
+          }
+        }
+
+        // Check rating filter
+        if (minRating != null) {
+          final rating = (restaurant['rating'] as num?)?.toDouble() ?? 0.0;
+          if (rating < minRating) {
+            return false;
+          }
+        }
+
+        // Check price filter
+        if (maxPrice != null) {
+          final price = (restaurant['price_level'] as num?)?.toDouble() ?? 0.0;
+          if (price > maxPrice) {
+            return false;
+          }
+        }
+
+        // Restaurant passed all filters
+        return true;
+      }).toList();
+
+      // Apply limit if specified
+      final results = limit != null && limit < filteredRestaurants.length
+          ? filteredRestaurants.take(limit).toList()
+          : filteredRestaurants;
+
+      // Return single restaurant if there's exactly one match
+      if (results.length == 1 && (name != null && name.isNotEmpty)) {
+        return results.first;
+      }
+
+      // Otherwise return the list
+      return results;
+    } catch (error) {
+      throw Exception('Error filtering restaurants: $error');
+    }
+  }
+
+// Additional helper method to fetch a restaurant by exact ID
+  Future<Map<String, dynamic>?> getRestaurantById(String id) async {
+    try {
+      final allRestaurants = await _fetchRestaurants();
+
+      final restaurant = allRestaurants.firstWhere(
+        (r) => r['id'].toString() == id,
+        orElse: () => <String, dynamic>{},
+      );
+
+      return restaurant.isEmpty ? null : restaurant;
+    } catch (error) {
+      throw Exception('Error fetching restaurant by ID: $error');
+    }
+  }
 }
