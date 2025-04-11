@@ -8,6 +8,10 @@ class AdminPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final restaurantsAsync = ref.watch(restaurantsNotifierProvider);
+    // Local state for filters
+    final nameController = TextEditingController();
+    final cityController = TextEditingController();
+    final countryController = TextEditingController();
 
     return Scaffold(
       appBar: AppBar(
@@ -17,11 +21,6 @@ class AdminPage extends ConsumerWidget {
       persistentFooterButtons: [
         StatefulBuilder(
           builder: (context, setState) {
-            // Local state for filters
-            final nameController = TextEditingController();
-            final cityController = TextEditingController();
-            final countryController = TextEditingController();
-
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -35,7 +34,24 @@ class AdminPage extends ConsumerWidget {
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.search),
-                        onPressed: () {
+                        onPressed: () async {
+                          // Get filtered results
+                          final filtered = await ref
+                              .read(restaurantsNotifierProvider.notifier)
+                              .getFilteredRestaurants(
+                                name: nameController.text,
+                                city: cityController.text,
+                                country: countryController.text,
+                              );
+                          // Convert to List if it's a single item
+                          final filteredList = filtered is Map
+                              ? [filtered as Map<String, dynamic>]
+                              : filtered as List<Map<String, dynamic>>;
+
+                          // Update the provider state with filtered results
+                          ref
+                              .read(restaurantsNotifierProvider.notifier)
+                              .updateFilteredResults(filteredList);
                           // Example query to supabase using the filter values
                           // ref.read(restaurantsNotifierProvider.notifier).filterRestaurants(
                           //   name: nameController.text,
@@ -72,7 +88,7 @@ class AdminPage extends ConsumerWidget {
                         padding: const EdgeInsets.all(8.0),
                         child: TextField(
                           controller: cityController,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: 'City',
                             border: OutlineInputBorder(),
                           ),
@@ -85,7 +101,7 @@ class AdminPage extends ConsumerWidget {
                         padding: const EdgeInsets.all(8.0),
                         child: TextField(
                           controller: countryController,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: 'Country',
                             border: OutlineInputBorder(),
                           ),
@@ -139,9 +155,10 @@ class AdminPage extends ConsumerWidget {
                         // Second row - Rating, distance, category
                         Row(
                           children: [
-                            Icon(Icons.star, size: 16, color: Colors.amber),
+                            const Icon(Icons.star,
+                                size: 16, color: Colors.amber),
                             Text(' ${restaurant['rating'] ?? '4.5'} · '),
-                            Icon(Icons.location_on,
+                            const Icon(Icons.location_on,
                                 size: 16, color: Colors.grey),
                             Text(' ${restaurant['distance'] ?? '1.2 km'} · '),
                             Text(restaurant['category'] ?? 'Restaurant',

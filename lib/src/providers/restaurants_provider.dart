@@ -220,4 +220,9 @@ class RestaurantsNotifier extends _$RestaurantsNotifier {
       throw Exception('Error fetching restaurant by ID: $error');
     }
   }
+
+  // Add this method to RestaurantsNotifier
+  void updateFilteredResults(List<Map<String, dynamic>> filtered) {
+    state = AsyncData(filtered);
+  }
 }
