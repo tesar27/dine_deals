@@ -9,11 +9,13 @@ import 'package:dine_deals/src/providers/cities_provider.dart';
 class MapWidget extends ConsumerStatefulWidget {
   final Function(String)? onMarkerTapped;
   final String chosenCity;
+  final bool isVisible; // Add isVisible parameter
 
   const MapWidget({
     super.key,
     this.onMarkerTapped,
     required this.chosenCity,
+    required this.isVisible, // Require isVisible
   });
 
   @override
@@ -33,27 +35,50 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
   // Default zoom level
   double _currentZoom = 13.0;
-  bool _isInitialLoad = true;
 
   @override
-  void didUpdateWidget(MapWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // If the chosen city changes, update the map center
-    if (widget.chosenCity != oldWidget.chosenCity &&
-        widget.chosenCity != 'Choose your city') {
-      _centerOnChosenCity();
+  void initState() {
+    super.initState();
+    if (widget.isVisible && widget.chosenCity != 'Choose your city') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          // Check if widget is still mounted
+          _centerOnChosenCity();
+        }
+      });
     }
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // When the widget is first built, try to center on the chosen city
-    if (_isInitialLoad && widget.chosenCity != 'Choose your city') {
+  void didUpdateWidget(MapWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // --- Handle City Change ---
+    if (widget.chosenCity != oldWidget.chosenCity &&
+        widget.chosenCity != 'Choose your city') {
+      // Center on the new city first
+      _centerOnChosenCity();
+      // Then, schedule a redraw after the frame to ensure tiles update
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _centerOnChosenCity();
+        if (mounted) {
+          // Trigger a slight map movement to force redraw
+          _mapController.move(
+              _mapController.camera.center, _mapController.camera.zoom);
+        }
       });
-      _isInitialLoad = false;
+    }
+    // --- Handle Becoming Visible ---
+    if (widget.isVisible && !oldWidget.isVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          // Trigger a slight map movement to force redraw
+          _mapController.move(
+              _mapController.camera.center, _mapController.camera.zoom);
+          // Also re-center on the city if needed (might be redundant now, but safe)
+          if (widget.chosenCity != 'Choose your city') {
+            _centerOnChosenCity();
+          }
+        }
+      });
     }
   }
 

@@ -320,14 +320,22 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       ),
       body: Stack(
         children: [
-          if (_isMapView)
-            MapWidget(
+          // Keep MapWidget in the tree but control visibility
+          Visibility(
+            visible: _isMapView,
+            maintainState: true,
+            child: MapWidget(
+              key: ValueKey(_chosenCity),
               onMarkerTapped: (restaurantName) {},
               chosenCity: _chosenCity,
-            )
-          else
-            const SizedBox.expand(
-              // <-- Use SizedBox.expand instead of Expanded
+              isVisible: _isMapView,
+            ),
+          ),
+
+          Visibility(
+            visible: !_isMapView,
+            maintainState: true,
+            child: const SizedBox.expand(
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,6 +345,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                 ),
               ),
             ),
+          ),
           Positioned(
             bottom: 16,
             left: 16,
@@ -389,6 +398,17 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                           onTap: () {
                             setState(() {
                               _isMapView = !_isMapView;
+
+                              // If switching to map view, give the map time to render
+                              // then trigger a refresh
+                              if (_isMapView) {
+                                Future.delayed(
+                                    const Duration(milliseconds: 100), () {
+                                  setState(() {
+                                    // This empty setState forces a rebuild after the map is visible
+                                  });
+                                });
+                              }
                             });
                           },
                           child: Container(
