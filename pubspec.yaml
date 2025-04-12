@@ -10,11 +10,18 @@ dependencies:
   apple_maps_flutter: ^1.4.0
   flutter:
     sdk: flutter
+  flutter_dotenv: ^5.2.1
   flutter_map: ^8.1.0
   flutter_riverpod: ^2.6.1
+  flutter_svg: ^2.0.17
+  geolocator: ^13.0.4
+  google_fonts: ^6.2.1
+  http: ^1.3.0
   image_picker: ^1.1.2
   latlong2: ^0.9.1
+  permission_handler: ^11.4.0
   riverpod_annotation: ^2.6.1
+  shared_preferences: ^2.5.3
   supabase_flutter: ^2.0.0
   timeago: ^3.1.0
 
@@ -29,3 +36,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env
+  fonts:
+    - family: SF Pro Display
+      fonts:
+        - asset: assets/fonts/SFPRODISPLAYREGULAR.otf
+        - asset: assets/fonts/SFPRODISPLAYMEDIUM.otf
+          weight: 500
+        - asset: assets/fonts/SFPRODISPLAYBOLD.otf
+          weight: 700

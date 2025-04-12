@@ -1,12 +1,32 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 part 'cities_provider.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 class CitiesNotifier extends _$CitiesNotifier {
+  PostgrestList? _cachedData;
+  static const String _cacheKey = 'cities_cache';
+
   @override
   Future<PostgrestList> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedJson = prefs.getString(_cacheKey);
+
+    if (cachedJson != null) {
+      try {
+        final List<dynamic> decoded = jsonDecode(cachedJson);
+        _cachedData = PostgrestList.from(decoded);
+        print("CitiesNotifier: Returning data from SharedPreferences");
+        return _cachedData!;
+      } catch (e) {
+        print("CitiesNotifier: Error parsing cached data: $e");
+        // Continue to fetch from API if parsing fails
+      }
+    }
+
     try {
       // .single() returns the Map directly on success or throws on error
       final citiesData = await Supabase.instance.client
@@ -18,8 +38,16 @@ class CitiesNotifier extends _$CitiesNotifier {
       // Returns PostgrestMap (Map<String, dynamic>) or throws PostgrestException
 
       print(
-          "CitiesNotifier: User data fetched successfully."); // Optional: for debugging
+          "CitiesNotifier: Cities data fetched successfully."); // Optional: for debugging
       // If we reach here, the query was successful and citiesData is the Map
+      // Save to SharedPreferences
+      try {
+        await prefs.setString(_cacheKey, jsonEncode(citiesData));
+        print("CitiesNotifier: Data saved to SharedPreferences");
+      } catch (e) {
+        print("CitiesNotifier: Error saving to SharedPreferences: $e");
+      }
+      _cachedData = citiesData;
       return citiesData; // Type is already Map<String, dynamic>
     } on PostgrestException catch (error) {
       // Handle specific Supabase errors
