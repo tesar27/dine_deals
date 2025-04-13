@@ -185,16 +185,25 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                         ),
                         const SizedBox(height: 15),
                         SizedBox(
-                          height: 200,
+                          height: 220, // Increased height
                           child: Row(
                             children: [
                               Expanded(
-                                child: CustomPaint(
-                                  painter: PieChartPainter(_stats),
-                                  child: Container(),
+                                flex: 3, // Adjusted flex ratio
+                                child: Padding(
+                                  padding: const EdgeInsets.all(
+                                      10.0), // Added padding
+                                  child: CustomPaint(
+                                    painter: PieChartPainter(_stats),
+                                    child: Container(),
+                                  ),
                                 ),
                               ),
+                              const SizedBox(
+                                  width:
+                                      16), // Added spacing between chart and details
                               Expanded(
+                                flex: 4, // Adjusted flex ratio
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.start,
