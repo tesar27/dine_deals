@@ -1,4 +1,5 @@
 import 'package:dine_deals/src/providers/cities_provider.dart';
+import 'package:dine_deals/src/providers/restaurants_provider.dart';
 import 'package:dine_deals/src/widgets/map_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,16 +15,28 @@ class DealsPage extends ConsumerStatefulWidget {
 
 class _DealsPageState extends ConsumerState<DealsPage> {
   static const String _cityPreferenceKey = 'chosen_city';
+  static const String _filtersPreferenceKey = 'selected_filters';
   String _chosenCity = 'Choose your city';
   bool _iconTapped = false;
   bool _isMapView = false;
   List<String> _selectedCategories = ["All"]; // Default to "All"
+  List<Map<String, dynamic>> _filteredRestaurants = [];
+  bool _isLoadingRestaurants = false;
 
   @override
   void initState() {
     super.initState();
-    // Load saved city when widget initializes
     _loadSavedCity();
+    _loadSavedFilters();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // If city is already loaded, fetch restaurants
+    if (_chosenCity != 'Choose your city') {
+      _fetchFilteredRestaurants();
+    }
   }
 
 // Load city from SharedPreferences
@@ -34,6 +47,8 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       setState(() {
         _chosenCity = savedCity;
       });
+      // Fetch restaurants after setting the city
+      _fetchFilteredRestaurants();
     }
   }
 
@@ -41,44 +56,100 @@ class _DealsPageState extends ConsumerState<DealsPage> {
   Future<void> _saveCity(String city) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_cityPreferenceKey, city);
+    // Fetch restaurants with new city filter
+    _fetchFilteredRestaurants();
   }
 
   void _showCitiesList(List<String> cities) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (BuildContext context) {
-        return Padding(
+        return Container(
+          height:
+              MediaQuery.of(context).size.height * 0.95, // 80% of screen height
           padding: EdgeInsets.only(
-            top: 16.0,
+            top: 14.0, // Extra top padding for dragging space
             bottom: MediaQuery.of(context).viewInsets.bottom +
                 MediaQuery.of(context).padding.bottom,
           ),
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.92,
-            child: ListView.builder(
-              itemCount: cities.length,
-              itemBuilder: (BuildContext context, int index) {
-                return ListTile(
-                  title: Text(
-                    cities[index],
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+          child: Column(
+            children: [
+              // Drag indicator and close button row
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0, right: 8.0),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Centered drag indicator
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                  ),
-                  onTap: () {
-                    setState(() {
-                      _chosenCity = cities[index];
-                      _iconTapped = false;
-                    });
-                    // Save city when selected
-                    _saveCity(cities[index]);
-                    Navigator.pop(context);
+                    // Close button on the right
+                    Positioned(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.close,
+                            size: 24,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: cities.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    return ListTile(
+                      title: Text(
+                        cities[index],
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      onTap: () {
+                        setState(() {
+                          _chosenCity = cities[index];
+                          _iconTapped = false;
+                        });
+                        // Save city when selected
+                        _saveCity(cities[index]);
+                        Navigator.pop(context);
+                      },
+                    );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -93,7 +164,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       builder: (BuildContext context) {
         return Padding(
           padding: EdgeInsets.only(
@@ -106,41 +177,66 @@ class _DealsPageState extends ConsumerState<DealsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Drag indicator
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[400],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Filter Options',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.titleLarge?.color,
                         ),
                       ),
-                      TextButton(
-                        onPressed: () {
-                          // Reset the temporary selections
-                          selectedTags.value = ["All"];
-                          tempSelectedCategories.clear();
-                          tempSelectedCategories.add("All");
-                          // You don't update state here yet
-                        },
-                        child: const Text(
-                          'Reset',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontWeight: FontWeight.bold,
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              // Reset the temporary selections
+                              selectedTags.value = ["All"];
+                              tempSelectedCategories.clear();
+                              tempSelectedCategories.add("All");
+                              // You don't update state here yet
+                            },
+                            child: Text(
+                              'Reset',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
                           ),
-                        ),
+                          IconButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            icon: const Icon(Icons.close),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const Divider(),
+                Divider(color: Theme.of(context).dividerColor),
                 // Categories section
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.0),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -149,9 +245,10 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.titleMedium?.color,
                         ),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
@@ -195,10 +292,24 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                                     selectedColor: Colors.blue[100],
                                     checkmarkColor: Colors.blue[800],
                                     avatar: Icon(icon, size: 18),
-                                    label: Text(name),
+                                    label: Text(
+                                      name,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Theme.of(context)
+                                                .colorScheme
+                                                .onPrimary
+                                            : Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.color,
+                                      ),
+                                    ),
                                     onSelected: (isSelected) {
                                       if (name == "All" && isSelected) {
                                         selectedTags.value = ["All"];
+                                        tempSelectedCategories.clear();
+                                        tempSelectedCategories.add("All");
                                       } else if (isSelected) {
                                         final newList = selected
                                             .where((tag) => tag != "All")
@@ -244,9 +355,12 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                         setState(() {
                           _selectedCategories = [...tempSelectedCategories];
                         });
+                        // Save filters to SharedPreferences
+                        _saveFilters(_selectedCategories);
                         // Apply the filters by fetching filtered restaurants
-                        _fetchFilteredRestaurants();
-                        Navigator.pop(context);
+                        Navigator.pop(context); // First close the modal
+                        // Then fetch with a slight delay to ensure UI is updated
+                        Future.microtask(() => _fetchFilteredRestaurants());
                       },
                       child: const Text('Apply Filters'),
                     ),
@@ -260,9 +374,81 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     );
   }
 
+// Save filters to SharedPreferences
+  Future<void> _saveFilters(List<String> filters) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_filtersPreferenceKey, filters);
+  }
+
+  // Load filters from SharedPreferences
+  Future<void> _loadSavedFilters() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedFilters = prefs.getStringList(_filtersPreferenceKey);
+    if (savedFilters != null && savedFilters.isNotEmpty) {
+      setState(() {
+        _selectedCategories = savedFilters;
+      });
+      // Fetch restaurants with saved filters if city is already selected
+      if (_chosenCity != 'Choose your city') {
+        _fetchFilteredRestaurants();
+      }
+    }
+  }
+
+  Future<void> _fetchFilteredRestaurants() async {
+    // Don't fetch if city isn't selected
+    if (_chosenCity == 'Choose your city') return;
+
+    setState(() {
+      _isLoadingRestaurants = true;
+    });
+
+    try {
+      // Get the restaurants provider
+      final restaurantsNotifier =
+          ref.read(restaurantsNotifierProvider.notifier);
+
+      // Get category filter (null if "All" is selected)
+      final categoryFilter = _selectedCategories.contains("All")
+          ? null
+          : _selectedCategories.isNotEmpty
+              ? _selectedCategories[0]
+              : null;
+
+      print(
+          "Applying filter: City=$_chosenCity, Category=$categoryFilter"); // Debug print
+
+      // Fetch filtered restaurants
+      final results = await restaurantsNotifier.getFilteredRestaurants(
+        city: _chosenCity,
+        category: categoryFilter,
+      );
+
+      setState(() {
+        _filteredRestaurants =
+            results is List ? results.cast<Map<String, dynamic>>() : [];
+        _isLoadingRestaurants = false;
+      });
+
+      print("Found ${_filteredRestaurants.length} restaurants"); // Debug print
+    } catch (error) {
+      print("Error fetching restaurants: $error"); // Debug print
+      setState(() {
+        _isLoadingRestaurants = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading restaurants: $error')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final citiesAsync = ref.watch(citiesNotifierProvider);
+    final restaurantsAsync = ref.watch(restaurantsNotifierProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -335,17 +521,61 @@ class _DealsPageState extends ConsumerState<DealsPage> {
           Visibility(
             visible: !_isMapView,
             maintainState: true,
-            child: const SizedBox.expand(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 600),
-                  ],
-                ),
-              ),
-            ),
+            child: _isLoadingRestaurants
+                ? const Center(child: CircularProgressIndicator())
+                : _chosenCity == 'Choose your city'
+                    ? Center(
+                        child: Text(
+                          'Please select a city first',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      )
+                    : _filteredRestaurants.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No restaurants found for the selected filters',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          )
+                        : SizedBox.expand(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Text(
+                                      'Found ${_filteredRestaurants.length} restaurants',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium,
+                                    ),
+                                  ),
+                                  ListView.builder(
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: _filteredRestaurants.length,
+                                    itemBuilder: (context, index) {
+                                      final restaurant =
+                                          _filteredRestaurants[index];
+                                      return ListTile(
+                                        title: Text(
+                                            restaurant['name'] ?? 'No name'),
+                                        subtitle: Text(restaurant['address'] ??
+                                            'No address'),
+                                        onTap: () {
+                                          // Navigate to restaurant detail page
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
           ),
+
           Positioned(
             bottom: 16,
             left: 16,
@@ -376,14 +606,14 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                                 bottomLeft: Radius.circular(30),
                               ),
                             ),
-                            child: const Row(
+                            child: Row(
                               children: [
-                                Icon(Icons.filter_list,
+                                const Icon(Icons.filter_list,
                                     color: Colors.white, size: 18),
-                                SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Text(
-                                  'Filter',
-                                  style: TextStyle(
+                                  'Filter ${_selectedCategories.contains("All") ? "" : "(${_selectedCategories.length})"}',
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -444,74 +674,6 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                     ),
                   ),
                 ),
-
-                // Right aligned button
-                // if (_isMapView)
-                //   Positioned(
-                //     right: 0,
-                //     child: FloatingActionButton(
-                //       heroTag: 'locate_me',
-                //       mini: true,
-                //       shape: const CircleBorder(),
-                //       backgroundColor: Colors.blue,
-                //       elevation: 0, // Remove shadow
-                //       onPressed: () async {
-                //         try {
-                //           // Show a loading message
-                //           ScaffoldMessenger.of(context).showSnackBar(
-                //             const SnackBar(
-                //                 content: Text('Fetching location...')),
-                //           );
-
-                //           // Get location
-                //           final position = await Geolocator.getCurrentPosition(
-                //             locationSettings: const LocationSettings(
-                //               accuracy: LocationAccuracy.high,
-                //             ),
-                //           );
-
-                //           // Get map controller
-                //           final mapController = ref.read(mapControllerProvider);
-                //           print('Map controller: $mapController');
-                //           print(
-                //               'Location: ${position.latitude}, ${position.longitude}');
-
-                //           // Move map to user location
-                //           // Create LatLng object from position
-                //           final latLng =
-                //               LatLng(position.latitude, position.longitude);
-
-                //           // Use a microtask to ensure UI updates after current execution
-                //           Future.microtask(() {
-                //             if (mapController != null) {
-                //               mapController.move(latLng, 15.0);
-                //             }
-                //             print('Map moved to: $latLng');
-
-                //             // Show success message
-                //             ScaffoldMessenger.of(context).showSnackBar(
-                //               const SnackBar(
-                //                   content: Text('Centered on your location')),
-                //             );
-                //           });
-                //         } catch (e) {
-                //           // Show error message
-                //           print('Location error: $e');
-                //           ScaffoldMessenger.of(context).showSnackBar(
-                //             SnackBar(
-                //               content: Text('Error: $e'),
-                //               backgroundColor: Colors.red,
-                //             ),
-                //           );
-                //         }
-                //       },
-                //       child: Transform.rotate(
-                //         angle: 45 * 3.14159 / 180, // 45 degrees in radians
-                //         child:
-                //             const Icon(Icons.navigation, color: Colors.white),
-                //       ),
-                //     ),
-                //   ),
               ],
             ),
           ),
@@ -520,5 +682,3 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     );
   }
 }
-
-void _fetchFilteredRestaurants() {}
