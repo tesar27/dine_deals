@@ -1,9 +1,14 @@
 import 'package:dine_deals/src/providers/cities_provider.dart';
+import 'package:dine_deals/src/providers/location_provider.dart';
 import 'package:dine_deals/src/providers/restaurants_provider.dart';
+import 'package:dine_deals/src/providers/deals_provider.dart';
 import 'package:dine_deals/src/widgets/map_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dine_deals/src/pages/details/place_details.dart';
 
 class DealsPage extends ConsumerStatefulWidget {
   const DealsPage({super.key});
@@ -95,30 +100,6 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                       ),
                     ),
                     // Close button on the right
-                    Positioned(
-                      child: GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.close,
-                            size: 24,
-                            color: Colors.grey[800],
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -415,24 +396,41 @@ class _DealsPageState extends ConsumerState<DealsPage> {
               ? _selectedCategories[0]
               : null;
 
-      print(
-          "Applying filter: City=$_chosenCity, Category=$categoryFilter"); // Debug print
-
       // Fetch filtered restaurants
       final results = await restaurantsNotifier.getFilteredRestaurants(
         city: _chosenCity,
         category: categoryFilter,
       );
 
+      // For each restaurant, fetch its deals
+      final dealsNotifier = ref.read(dealsNotifierProvider.notifier);
+      List<Map<String, dynamic>> restaurantsWithDeals = [];
+
+      for (var restaurant
+          in results is List ? results.cast<Map<String, dynamic>>() : []) {
+        try {
+          final restaurantId = restaurant['id']?.toString();
+          if (restaurantId != null) {
+            final deals =
+                await dealsNotifier.getDealsForRestaurant(restaurantId);
+            // Add deals count to the restaurant map
+            restaurant['deals_count'] = deals.length;
+            restaurant['deals'] = deals;
+          }
+          restaurantsWithDeals.add(restaurant);
+        } catch (e) {
+          // Continue with next restaurant if there's an error fetching deals
+          print("Error fetching deals for restaurant: $e");
+          restaurantsWithDeals.add(restaurant);
+        }
+      }
+
       setState(() {
-        _filteredRestaurants =
-            results is List ? results.cast<Map<String, dynamic>>() : [];
+        _filteredRestaurants = restaurantsWithDeals;
         _isLoadingRestaurants = false;
       });
-
-      print("Found ${_filteredRestaurants.length} restaurants"); // Debug print
     } catch (error) {
-      print("Error fetching restaurants: $error"); // Debug print
+      print("Error fetching restaurants: $error");
       setState(() {
         _isLoadingRestaurants = false;
       });
@@ -445,10 +443,106 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     }
   }
 
+  // Add a method to find the nearest city from user location
+  Future<void> _findNearestCity(Position position) async {
+    setState(() {
+      _isLoadingRestaurants = true;
+    });
+
+    try {
+      final citiesAsync = ref.read(citiesNotifierProvider);
+
+      final cities = await citiesAsync.when(
+        data: (data) => Future.value(data),
+        loading: () => throw Exception('Cities data is still loading'),
+        error: (error, stack) =>
+            throw Exception('Error loading cities: $error'),
+      );
+
+      if (cities.isEmpty) {
+        throw Exception('No cities available');
+      }
+
+      // Find the nearest city by calculating distance
+      double nearestDistance = double.infinity;
+      Map<String, dynamic> nearestCity = cities.first;
+
+      for (final city in cities) {
+        if (city['latitude'] == null || city['longitude'] == null) continue;
+
+        // Parse city coordinates
+        final cityLat = double.parse(city['latitude'].toString());
+        final cityLng = double.parse(city['longitude'].toString());
+
+        // Calculate distance using the Distance class from latlong2 package
+        final distance = Distance().as(
+          LengthUnit.Kilometer,
+          LatLng(position.latitude, position.longitude),
+          LatLng(cityLat, cityLng),
+        );
+
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestCity = city;
+        }
+      }
+
+      // Update the chosen city
+      final cityName = nearestCity['name'] as String;
+      setState(() {
+        _chosenCity = cityName;
+        _isLoadingRestaurants = false;
+      });
+
+      // Save city preference
+      await _saveCity(cityName);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nearest city found: $cityName')),
+      );
+    } catch (error) {
+      setState(() {
+        _isLoadingRestaurants = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error finding nearest city: $error')),
+        );
+      }
+    }
+  }
+
+  // Method to request location and find nearest city
+  Future<void> _locateUserAndFindCity() async {
+    try {
+      setState(() {
+        _isLoadingRestaurants = true;
+      });
+
+      // Use location provider to get user's position
+      final locationProvider = ref.read(locationNotifierProvider.notifier);
+      await locationProvider.refreshLocation();
+      final position = await ref.read(locationNotifierProvider.future);
+
+      // Find the nearest city based on user's location
+      await _findNearestCity(position);
+    } catch (error) {
+      setState(() {
+        _isLoadingRestaurants = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error locating you: $error')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final citiesAsync = ref.watch(citiesNotifierProvider);
-    final restaurantsAsync = ref.watch(restaurantsNotifierProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -525,9 +619,28 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                 ? const Center(child: CircularProgressIndicator())
                 : _chosenCity == 'Choose your city'
                     ? Center(
-                        child: Text(
-                          'Please select a city first',
-                          style: Theme.of(context).textTheme.titleLarge,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Please select a city first',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton.icon(
+                              onPressed: _locateUserAndFindCity,
+                              icon: const Icon(Icons.my_location),
+                              label: const Text('Locate Me'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       )
                     : _filteredRestaurants.isEmpty
@@ -537,42 +650,182 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           )
-                        : SizedBox.expand(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Text(
-                                      'Found ${_filteredRestaurants.length} restaurants',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium,
-                                    ),
+                        : ListView.builder(
+                            padding: const EdgeInsets.only(
+                                top: 16,
+                                bottom:
+                                    80), // Add bottom padding for the button row
+                            itemCount: _filteredRestaurants.length,
+                            itemBuilder: (context, index) {
+                              final restaurant = _filteredRestaurants[index];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 8.0, horizontal: 16.0),
+                                child: InkWell(
+                                  onTap: () {
+                                    // Navigate to restaurant detail page
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => PlaceDetails(
+                                          restaurant: restaurant,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Left side - Image
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.network(
+                                          restaurant['imageUrl'] ??
+                                              'https://kpceyekfdauxsbljihst.supabase.co/storage/v1/object/public/pictures//cheeseburger-7580676_1280.jpg',
+                                          width: 100,
+                                          height: 100,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                            return Container(
+                                              width: 100,
+                                              height: 100,
+                                              color: Colors.grey[300],
+                                              child: const Icon(
+                                                  Icons.restaurant,
+                                                  color: Colors.grey),
+                                            );
+                                          },
+                                          loadingBuilder: (context, child,
+                                              loadingProgress) {
+                                            if (loadingProgress == null) {
+                                              return child;
+                                            }
+                                            return Container(
+                                              width: 100,
+                                              height: 100,
+                                              color: Colors.grey[200],
+                                              child: Center(
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  value: loadingProgress
+                                                              .expectedTotalBytes !=
+                                                          null
+                                                      ? loadingProgress
+                                                              .cumulativeBytesLoaded /
+                                                          loadingProgress
+                                                              .expectedTotalBytes!
+                                                      : null,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      // Right side - Information
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            // First row - Restaurant name
+                                            Text(
+                                              restaurant['name'] ?? 'No name',
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 8),
+                                            // Second row - Rating, address
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.star,
+                                                    size: 16,
+                                                    color: Colors.amber),
+                                                Text(
+                                                    ' ${restaurant['rating'] ?? '4.5'} · '),
+                                                const Icon(Icons.location_on,
+                                                    size: 16,
+                                                    color: Colors.grey),
+                                                Expanded(
+                                                  child: Text(
+                                                    ' ${_getShortAddress(restaurant['address'] ?? 'No address')}',
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 8),
+                                            // Third row - Categories as offers
+                                            Wrap(
+                                              spacing: 8,
+                                              runSpacing: 8,
+                                              children: _getCategoriesAsList(
+                                                      restaurant)
+                                                  .map((category) {
+                                                return Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.green[100],
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            12),
+                                                  ),
+                                                  child: Text(
+                                                    category,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.black87,
+                                                    ),
+                                                  ),
+                                                );
+                                              }).toList(),
+                                            ),
+                                            // Show deals count if available
+                                            if (restaurant['deals_count'] !=
+                                                    null &&
+                                                restaurant['deals_count'] > 0)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                    top: 8.0),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.local_offer,
+                                                        size: 16,
+                                                        color:
+                                                            Colors.green[700]),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '${restaurant['deals_count']} special ${restaurant['deals_count'] == 1 ? 'offer' : 'offers'} available',
+                                                      style: TextStyle(
+                                                        color:
+                                                            Colors.green[700],
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  ListView.builder(
-                                    shrinkWrap: true,
-                                    physics:
-                                        const NeverScrollableScrollPhysics(),
-                                    itemCount: _filteredRestaurants.length,
-                                    itemBuilder: (context, index) {
-                                      final restaurant =
-                                          _filteredRestaurants[index];
-                                      return ListTile(
-                                        title: Text(
-                                            restaurant['name'] ?? 'No name'),
-                                        subtitle: Text(restaurant['address'] ??
-                                            'No address'),
-                                        onTap: () {
-                                          // Navigate to restaurant detail page
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
+                                ),
+                              );
+                            },
                           ),
           ),
 
@@ -680,5 +933,34 @@ class _DealsPageState extends ConsumerState<DealsPage> {
         ],
       ),
     );
+  }
+
+  // Helper method to get a shortened address
+  String _getShortAddress(String address) {
+    // Split by commas and return just the first part, or the whole string if no commas
+    final parts = address.split(',');
+    return parts.isNotEmpty ? parts[0].trim() : address;
+  }
+
+  // Helper method to get categories as a list
+  List<String> _getCategoriesAsList(Map<String, dynamic> restaurant) {
+    // Try to get categories from restaurant data
+    final categories = restaurant['categories'];
+
+    if (categories == null) {
+      // No categories, return default
+      return ['Restaurant'];
+    } else if (categories is String) {
+      // If it's a string, split by commas or return as single item
+      return categories.contains(',')
+          ? categories.split(',').map((e) => e.trim()).toList()
+          : [categories];
+    } else if (categories is List) {
+      // If it's already a list, convert all items to strings
+      return categories.map((e) => e.toString()).toList();
+    }
+
+    // Fallback case
+    return ['Restaurant'];
   }
 }

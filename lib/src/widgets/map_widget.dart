@@ -5,17 +5,20 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:dine_deals/src/providers/restaurants_provider.dart';
 import 'package:dine_deals/src/providers/cities_provider.dart';
+import 'package:dine_deals/src/providers/location_provider.dart';
 
 class MapWidget extends ConsumerStatefulWidget {
   final Function(String)? onMarkerTapped;
   final String chosenCity;
-  final bool isVisible; // Add isVisible parameter
+  final bool isVisible;
+  final List<Map<String, dynamic>>? restaurants; // Add restaurants parameter
 
   const MapWidget({
     super.key,
     this.onMarkerTapped,
     required this.chosenCity,
-    required this.isVisible, // Require isVisible
+    required this.isVisible,
+    this.restaurants, // Add this parameter
   });
 
   @override
@@ -23,17 +26,13 @@ class MapWidget extends ConsumerStatefulWidget {
 }
 
 class _MapWidgetState extends ConsumerState<MapWidget> {
-  // final MapController _mapController = MapController();
-  // Add these state variables at the start of your _MapWidgetState class
   LatLng? _userLocation;
   bool _showUserLocation = false;
-  // Default Zurich coordinates
   static const double zurichLat = 47.3769;
   static const double zurichLng = 8.5417;
 
-  final _mapController = MapController(); // Create local instance
+  final _mapController = MapController();
 
-  // Default zoom level
   double _currentZoom = 13.0;
 
   @override
@@ -42,7 +41,6 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
     if (widget.isVisible && widget.chosenCity != 'Choose your city') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          // Check if widget is still mounted
           _centerOnChosenCity();
         }
       });
@@ -52,28 +50,21 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
   @override
   void didUpdateWidget(MapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // --- Handle City Change ---
     if (widget.chosenCity != oldWidget.chosenCity &&
         widget.chosenCity != 'Choose your city') {
-      // Center on the new city first
       _centerOnChosenCity();
-      // Then, schedule a redraw after the frame to ensure tiles update
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          // Trigger a slight map movement to force redraw
           _mapController.move(
               _mapController.camera.center, _mapController.camera.zoom);
         }
       });
     }
-    // --- Handle Becoming Visible ---
     if (widget.isVisible && !oldWidget.isVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          // Trigger a slight map movement to force redraw
           _mapController.move(
               _mapController.camera.center, _mapController.camera.zoom);
-          // Also re-center on the city if needed (might be redundant now, but safe)
           if (widget.chosenCity != 'Choose your city') {
             _centerOnChosenCity();
           }
@@ -87,21 +78,18 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
     final citiesAsync = ref.read(citiesNotifierProvider);
 
     citiesAsync.whenData((cities) {
-      // Find the chosen city in the list
       final chosenCityData = cities.firstWhere(
         (city) => city['name'] == widget.chosenCity,
         orElse: () =>
             {'name': widget.chosenCity, 'latitude': null, 'longitude': null},
       );
 
-      // Check if we have coordinates for the chosen city
       if (chosenCityData['latitude'] != null &&
           chosenCityData['longitude'] != null) {
         final lat = double.parse(chosenCityData['latitude'].toString());
         final lng = double.parse(chosenCityData['longitude'].toString());
         _mapController.move(LatLng(lat, lng), _currentZoom);
       } else {
-        // If city doesn't have coordinates, try to filter restaurants by city name
         final restaurantsAsync = ref.read(restaurantsNotifierProvider);
         restaurantsAsync.whenData((restaurants) {
           final cityRestaurants = restaurants
@@ -143,10 +131,10 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch the restaurants provider
-    final restaurantsAsync = ref.watch(restaurantsNotifierProvider);
+    final restaurantsAsync = widget.restaurants != null
+        ? AsyncData<List<Map<String, dynamic>>>(widget.restaurants!)
+        : ref.watch(restaurantsNotifierProvider);
 
-    // Filter restaurants by chosen city if a city is selected
     final filteredRestaurantsAsync = restaurantsAsync.whenData((restaurants) {
       if (widget.chosenCity == 'Choose your city') {
         return restaurants;
@@ -166,7 +154,6 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
             Expanded(
               child: Stack(
                 children: [
-                  // Wrap FlutterMap with a Stack
                   FlutterMap(
                     mapController: _mapController,
                     options: MapOptions(
@@ -175,31 +162,20 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                     ),
                     children: [
                       TileLayer(
-                        // CARTO Voyager No Labels - designed for minimal place markers
                         urlTemplate:
                             'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                        subdomains: const [
-                          'a',
-                          'b',
-                          'c',
-                          'd'
-                        ], // Standard CARTO subdomains
-                        // It's polite and often required to identify your app
-                        // IMPORTANT: Replace with your actual package name
+                        subdomains: const ['a', 'b', 'c', 'd'],
                         userAgentPackageName: 'com.dinedeals.app',
-                        // tileProvider: CachedTileProvider(), // Optional: Enables caching tiles locally
                         retinaMode:
                             MediaQuery.of(context).devicePixelRatio > 1.0,
                       ),
-                      // Add this CircleLayer for the user's location
                       if (_showUserLocation && _userLocation != null)
                         CircleLayer(
                           circles: [
                             CircleMarker(
                               point: _userLocation!,
                               radius: 10,
-                              color: Colors.blue
-                                  .withOpacity(0.7), // Inner blue circle
+                              color: Colors.blue.withOpacity(0.7),
                               borderColor: Colors.white,
                               borderStrokeWidth: 2,
                               useRadiusInMeter: false,
@@ -207,15 +183,13 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                             CircleMarker(
                               point: _userLocation!,
                               radius: 30,
-                              color: Colors.blue
-                                  .withOpacity(0.2), // Outer blue circle
+                              color: Colors.blue.withOpacity(0.2),
                               useRadiusInMeter: false,
                             ),
                           ],
                         ),
                       MarkerLayer(
                         markers: restaurants.map((restaurant) {
-                          // Extract coordinates from restaurant data
                           final double lat = restaurant['latitude'] != null
                               ? double.parse(restaurant['latitude'].toString())
                               : zurichLat;
@@ -257,7 +231,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                               child: const Column(
                                 children: [
                                   Icon(
-                                    Icons.restaurant,
+                                    Icons.fastfood,
                                     color: Colors.red,
                                     size: 30,
                                   ),
@@ -267,32 +241,23 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                           );
                         }).toList(),
                       ),
-                      // --- Attribution Layer (Very Important!) ---
-                      // You MUST attribute the map data source (OSM) and the tile provider (CARTO)
                       const RichAttributionWidget(
-                        alignment: AttributionAlignment
-                            .bottomLeft, // Position at the bottom left
-                        // popupInitialDisplayDuration: Duration(seconds: 5),
-                        animationConfig: ScaleRAWA(), // Optional nice animation
+                        alignment: AttributionAlignment.bottomLeft,
+                        animationConfig: ScaleRAWA(),
                         attributions: [
                           TextSourceAttribution(
                             '© OpenStreetMap contributors',
-                            // Optional: Make OSM link clickable (requires url_launcher package)
-                            // onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')),
                           ),
                           TextSourceAttribution(
                             'CARTO',
-                            // Optional: Make CARTO link clickable (requires url_launcher package)
-                            // onTap: () => launchUrl(Uri.parse('https://carto.com/attributions')),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  // Add the Locate Me button
                   Positioned(
                     right: 16,
-                    bottom: 20, // Position above the controls container
+                    bottom: 20,
                     child: FloatingActionButton(
                       heroTag: 'locate_me',
                       mini: true,
@@ -301,22 +266,18 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                       elevation: 0,
                       onPressed: () async {
                         try {
-                          // Get location
                           final position = await Geolocator.getCurrentPosition(
                             locationSettings: const LocationSettings(
                               accuracy: LocationAccuracy.high,
                             ),
                           );
-                          // Update state to show user location
                           setState(() {
                             _userLocation =
                                 LatLng(position.latitude, position.longitude);
                             _showUserLocation = true;
                           });
-                          // Move map to user location
                           _mapController.move(_userLocation!, 15.0);
                         } catch (e) {
-                          // Show error message
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Error: $e'),
@@ -341,7 +302,6 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Center button changes based on chosen city
                   ElevatedButton.icon(
                     onPressed: widget.chosenCity != 'Choose your city'
                         ? _centerOnChosenCity
