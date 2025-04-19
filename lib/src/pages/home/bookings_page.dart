@@ -37,10 +37,10 @@ class _BookingsPageState extends State<BookingsPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Bookings'),
+        title: const Text('Bookings'),
         bottom: TabBar(
           controller: _tabController,
-          tabs: [
+          tabs: const [
             Tab(text: 'Active'),
             Tab(text: 'History'),
           ],
@@ -58,7 +58,7 @@ class _BookingsPageState extends State<BookingsPage>
 
   Widget _buildBookingsList(List<Map<String, String>> bookings) {
     if (bookings.isEmpty) {
-      return Center(child: Text('No bookings available.'));
+      return const Center(child: Text('No bookings available.'));
     }
     return ListView.builder(
       itemCount: bookings.length,
@@ -67,7 +67,7 @@ class _BookingsPageState extends State<BookingsPage>
         return ListTile(
           title: Text(booking['title']!),
           subtitle: Text(booking['details']!),
-          leading: Icon(Icons.local_offer),
+          leading: const Icon(Icons.local_offer),
         );
       },
     );

@@ -4,7 +4,7 @@ import 'package:dine_deals/src/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dine_deals/main.dart';
-import 'package:dine_deals/src/pages/auth/otp_signup_page.dart';
+import 'package:dine_deals/src/pages/auth/auth_page.dart';
 import 'dart:math' as math;
 
 class AccountPage extends ConsumerStatefulWidget {
@@ -70,7 +70,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
     } finally {
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const OtpSignupPage()),
+          MaterialPageRoute(builder: (_) => const AuthPage()),
         );
       }
     }

@@ -1,4 +1,4 @@
-import 'package:dine_deals/src/pages/auth/otp_signup_page.dart';
+import 'package:dine_deals/src/pages/auth/auth_page.dart';
 import 'package:dine_deals/src/pages/home/home_page.dart';
 import 'package:dine_deals/src/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
@@ -33,7 +33,7 @@ class MyApp extends ConsumerWidget {
       darkTheme: ref.watch(themeDataProvider(Brightness.dark)),
       themeMode: themeMode,
       home: supabase.auth.currentSession == null
-          ? const OtpSignupPage()
+          ? const AuthPage()
           : const HomePage(),
     );
   }
