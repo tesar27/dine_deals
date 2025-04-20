@@ -249,6 +249,122 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
     );
   }
 
+  void _showMenuBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.9, // Takes 90% of screen height
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              // Draggable indicator
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Menu',
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildMenuCategory('Salads', [
+                          {'name': 'Greek Salad', 'price': '12.50'},
+                          {'name': 'Caesar Salad', 'price': '14.00'},
+                          {'name': 'Garden Salad', 'price': '9.50'},
+                        ]),
+                        _buildMenuCategory('Main Courses', [
+                          {'name': 'Grilled Salmon', 'price': '24.00'},
+                          {'name': 'Beef Steak', 'price': '28.50'},
+                          {'name': 'Vegetable Pasta', 'price': '18.00'},
+                        ]),
+                        _buildMenuCategory('Desserts', [
+                          {'name': 'Chocolate Cake', 'price': '8.50'},
+                          {'name': 'Ice Cream', 'price': '6.00'},
+                          {'name': 'Fruit Salad', 'price': '7.50'},
+                        ]),
+                        _buildMenuCategory('Drinks', [
+                          {'name': 'Fresh Orange Juice', 'price': '5.00'},
+                          {'name': 'Sparkling Water', 'price': '3.50'},
+                          {'name': 'Coffee', 'price': '4.00'},
+                        ]),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMenuCategory(String title, List<Map<String, String>> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Divider(),
+        ...items.map((item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(item['name'] ?? ''),
+                  Text(
+                    '${item['price']} CHF',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            )),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -270,23 +386,52 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
           children: [
             Stack(
               children: [
-                ClipPath(
-                  clipper: BottomOvalClipper(),
-                  child: Image.network(
-                    widget.restaurant['imageUrl'] ??
-                        'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-                    width: double.infinity,
-                    height: 300,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: double.infinity,
-                        height: 300,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.restaurant,
-                            color: Colors.grey, size: 64),
-                      );
-                    },
+                SizedBox(
+                  width: double.infinity,
+                  height: 300,
+                  child: Stack(
+                    children: [
+                      // Restaurant image
+                      Positioned.fill(
+                        child: Image.network(
+                          widget.restaurant['imageUrl'] ??
+                              'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+                          width: double.infinity,
+                          height: 300,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: double.infinity,
+                              height: 300,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.restaurant,
+                                  color: Colors.grey, size: 64),
+                            );
+                          },
+                        ),
+                      ),
+                      // Gradient overlay at the bottom
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: 60,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.white.withOpacity(0.0),
+                                Colors.white.withOpacity(0.7),
+                                Colors.white,
+                              ],
+                              stops: const [0.0, 0.7, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -364,6 +509,74 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
                             fontSize: 16,
                             color: Colors.grey[700],
                           ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Action Buttons Row (Menu, Favorite, Share)
+                  Row(
+                    children: [
+                      // Menu Button (75% width)
+                      Expanded(
+                        flex: 75,
+                        child: ElevatedButton.icon(
+                          icon:
+                              const Icon(Icons.menu_book, color: Colors.black),
+                          label: const Text(
+                            'Menu',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onPressed: () => _showMenuBottomSheet(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                              side: BorderSide(color: Colors.grey.shade300),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Favorite Button
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.favorite_border,
+                              color: Colors.black),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Added to favorites')),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Share Button
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.share, color: Colors.black),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text('Share functionality triggered')),
+                            );
+                          },
                         ),
                       ),
                     ],
@@ -481,20 +694,4 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
       }).toList(),
     );
   }
-}
-
-class BottomOvalClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    path.lineTo(0, size.height - 20);
-    path.quadraticBezierTo(
-        size.width / 2, size.height - 40, size.width, size.height - 20);
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }

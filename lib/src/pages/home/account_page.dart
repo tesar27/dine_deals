@@ -38,7 +38,9 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   @override
   void initState() {
     super.initState();
-    _initializeProfile();
+    if (isUserSignedIn()) {
+      _initializeProfile();
+    }
   }
 
   void _initializeProfile() {
@@ -82,260 +84,289 @@ class _AccountPageState extends ConsumerState<AccountPage> {
     context.showSnackBar('Navigate to edit profile page');
   }
 
+  void _navigateToSignIn() {
+    Navigator.of(context).push(AuthPage.route());
+  }
+
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(userNotifierProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final isSignedIn = isUserSignedIn();
 
     return Scaffold(
-      body: userAsync.when(
-        data: (user) {
-          if (user == null) {
-            return const Center(child: Text('No user data available.'));
-          }
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isSignedIn) ...[
+                  // Only show user profile if signed in
+                  userAsync.when(
+                    data: (user) {
+                      if (user == null) {
+                        return const Center(
+                            child: Text('No user data available.'));
+                      }
 
-          return SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Top row with name and avatar
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _firstName,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              _lastName,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        GestureDetector(
-                          onTap: _navigateToPreEditPage,
-                          child: CircleAvatar(
-                            radius: 35,
-                            backgroundImage: _avatarUrl != null
-                                ? NetworkImage(_avatarUrl!)
-                                : null,
-                            child: _avatarUrl == null
-                                ? Text(
-                                    _firstName.isNotEmpty ? _firstName[0] : '?',
-                                    style: const TextStyle(fontSize: 30),
-                                  )
-                                : null,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    // Main option tiles: Favorites, Wallet, Orders
-                    Row(
-                      children: [
-                        _buildOptionTile(
-                          icon: Icons.favorite,
-                          label: 'Favorites',
-                          color: Colors.pinkAccent,
-                          onTap: () {},
-                        ),
-                        const SizedBox(width: 12),
-                        _buildOptionTile(
-                          icon: Icons.account_balance_wallet,
-                          label: 'Wallet',
-                          color: Colors.purpleAccent,
-                          onTap: () {},
-                        ),
-                        const SizedBox(width: 12),
-                        _buildOptionTile(
-                          icon: Icons.receipt_long,
-                          label: 'Orders',
-                          color: Colors.orangeAccent,
-                          onTap: () {},
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    // Stats pie chart
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Your Activity',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 15),
-                        SizedBox(
-                          height: 220, // Increased height
-                          child: Row(
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Top row with name and avatar
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(
-                                flex: 3, // Adjusted flex ratio
-                                child: Padding(
-                                  padding: const EdgeInsets.all(
-                                      10.0), // Added padding
-                                  child: CustomPaint(
-                                    painter: PieChartPainter(_stats),
-                                    child: Container(),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _firstName,
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
+                                  Text(
+                                    _lastName,
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(
-                                  width:
-                                      16), // Added spacing between chart and details
-                              Expanded(
-                                flex: 4, // Adjusted flex ratio
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: _stats.entries.map((entry) {
-                                    final index =
-                                        _stats.keys.toList().indexOf(entry.key);
-                                    final colors = [
-                                      Colors.red,
-                                      Colors.green,
-                                      Colors.blue,
-                                      Colors.amber,
-                                      Colors.purple,
-                                      Colors.teal,
-                                    ];
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 4.0),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 12,
-                                            height: 12,
-                                            color:
-                                                colors[index % colors.length],
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${entry.key}: ${entry.value}',
-                                            style:
-                                                const TextStyle(fontSize: 14),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
+                              GestureDetector(
+                                onTap: _navigateToPreEditPage,
+                                child: CircleAvatar(
+                                  radius: 35,
+                                  backgroundImage: _avatarUrl != null
+                                      ? NetworkImage(_avatarUrl!)
+                                      : null,
+                                  child: _avatarUrl == null
+                                      ? Text(
+                                          _firstName.isNotEmpty
+                                              ? _firstName[0]
+                                              : '?',
+                                          style: const TextStyle(fontSize: 30),
+                                        )
+                                      : null,
                                 ),
                               ),
                             ],
                           ),
+
+                          const SizedBox(height: 30),
+
+                          // Main option tiles: Favorites, Wallet, Orders
+                          Row(
+                            children: [
+                              _buildOptionTile(
+                                icon: Icons.favorite,
+                                label: 'Favorites',
+                                color: Colors.pinkAccent,
+                                onTap: () {},
+                              ),
+                              const SizedBox(width: 12),
+                              _buildOptionTile(
+                                icon: Icons.account_balance_wallet,
+                                label: 'Wallet',
+                                color: Colors.purpleAccent,
+                                onTap: () {},
+                              ),
+                              const SizedBox(width: 12),
+                              _buildOptionTile(
+                                icon: Icons.receipt_long,
+                                label: 'Orders',
+                                color: Colors.orangeAccent,
+                                onTap: () {},
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          // Stats pie chart
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Your Activity',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 15),
+                              SizedBox(
+                                height: 220,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 3,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(10.0),
+                                        child: CustomPaint(
+                                          painter: PieChartPainter(_stats),
+                                          child: Container(),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      flex: 4,
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: _stats.entries.map((entry) {
+                                          final index = _stats.keys
+                                              .toList()
+                                              .indexOf(entry.key);
+                                          final colors = [
+                                            Colors.red,
+                                            Colors.green,
+                                            Colors.blue,
+                                            Colors.amber,
+                                            Colors.purple,
+                                            Colors.teal,
+                                          ];
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 4.0),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  width: 12,
+                                                  height: 12,
+                                                  color: colors[
+                                                      index % colors.length],
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  '${entry.key}: ${entry.value}',
+                                                  style: const TextStyle(
+                                                      fontSize: 14),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (error, stack) =>
+                        Center(child: Text('Error: $error')),
+                  ),
+                ] else ...[
+                  // Show sign in button for guests
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.account_circle_outlined,
+                          size: 80,
+                          color: Colors.grey,
                         ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Sign in to access your account',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: _navigateToSignIn,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 32),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'Sign In',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
                       ],
                     ),
+                  ),
+                ],
 
-                    const SizedBox(height: 30),
+                const SizedBox(height: 30),
 
-                    // Settings items
-                    _buildSettingsItem(
-                      icon: Icons.help_outline,
-                      title: 'Help',
-                      onTap: () {},
-                    ),
-                    _buildSettingsItem(
-                      icon: Icons.info_outline,
-                      title: 'About',
-                      onTap: () {},
-                    ),
-                    _buildSettingsItem(
-                      icon: Icons.logout,
-                      title: 'Sign Out',
-                      onTap: _signOut,
-                      isDestructive: true,
-                    ),
-
-                    // Theme toggle with icon
-                    ListTile(
-                      leading: Icon(themeMode == ThemeMode.dark
-                          ? Icons.light_mode
-                          : Icons.dark_mode),
-                      title: const Text('Appearance'),
-                      subtitle: Text(themeMode == ThemeMode.dark
-                          ? 'Dark Mode'
-                          : 'Light Mode'),
-                      trailing: Switch(
-                        value: themeMode == ThemeMode.dark,
-                        onChanged: (_) {
-                          ref.read(themeModeProvider.notifier).toggleTheme();
-                        },
-                      ),
-                    ),
-                    _buildSettingsItem(
-                      icon: Icons.admin_panel_settings,
-                      title: 'Admin Panel',
-                      onTap: () {
-                        if (isSuperAdmin == 'true') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                                builder: (_) => const AdminPage()),
-                          );
-                        } else {
-                          context.showSnackBar('You do not have admin access');
-                        }
-                      },
-                      isDestructive: true,
-                    ),
-                    // Full theme selector
-                    // ListTile(
-                    //   leading: const Icon(Icons.settings_brightness),
-                    //   title: const Text('Theme Mode'),
-                    //   trailing: DropdownButton<ThemeMode>(
-                    //     value: themeMode,
-                    //     underline: const SizedBox(),
-                    //     onChanged: (ThemeMode? newMode) {
-                    //       if (newMode != null) {
-                    //         ref
-                    //             .read(themeModeProvider.notifier)
-                    //             .setThemeMode(newMode);
-                    //       }
-                    //     },
-                    //     items: const [
-                    //       DropdownMenuItem(
-                    //         value: ThemeMode.system,
-                    //         child: Text('System'),
-                    //       ),
-                    //       DropdownMenuItem(
-                    //         value: ThemeMode.light,
-                    //         child: Text('Light'),
-                    //       ),
-                    //       DropdownMenuItem(
-                    //         value: ThemeMode.dark,
-                    //         child: Text('Dark'),
-                    //       ),
-                    //     ],
-                    //   ),
-                    // ),
-                  ],
+                // Settings items - always visible for all users
+                // Theme toggle with icon
+                ListTile(
+                  leading: Icon(themeMode == ThemeMode.dark
+                      ? Icons.light_mode
+                      : Icons.dark_mode),
+                  title: const Text('Appearance'),
+                  subtitle: Text(
+                      themeMode == ThemeMode.dark ? 'Dark Mode' : 'Light Mode'),
+                  trailing: Switch(
+                    value: themeMode == ThemeMode.dark,
+                    onChanged: (_) {
+                      ref.read(themeModeProvider.notifier).toggleTheme();
+                    },
+                  ),
                 ),
-              ),
+                _buildSettingsItem(
+                  icon: Icons.help_outline,
+                  title: 'Help',
+                  onTap: () {},
+                ),
+                _buildSettingsItem(
+                  icon: Icons.info_outline,
+                  title: 'About',
+                  onTap: () {},
+                ),
+
+                // Only show admin panel and sign out for logged in users
+                if (isSignedIn) ...[
+                  _buildSettingsItem(
+                    icon: Icons.admin_panel_settings,
+                    title: 'Admin Panel',
+                    onTap: () {
+                      if (isSuperAdmin == 'true') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const AdminPage()),
+                        );
+                      } else {
+                        context.showSnackBar('You do not have admin access');
+                      }
+                    },
+                    isDestructive: true,
+                  ),
+                  _buildSettingsItem(
+                    icon: Icons.logout,
+                    title: 'Sign Out',
+                    onTap: _signOut,
+                    isDestructive: true,
+                  ),
+                ],
+              ],
             ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text('Error: $error')),
+          ),
+        ),
       ),
     );
   }

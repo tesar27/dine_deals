@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dine_deals/src/pages/auth/profile_setup_page.dart';
 import 'package:dine_deals/src/pages/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -80,9 +81,33 @@ class _AuthPageState extends State<AuthPage> {
             : OtpType.email,
       );
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomePage()),
-        );
+        // Check if user exists in users table or needs profile setup
+        final user = supabase.auth.currentUser;
+        if (user != null) {
+          final userData = await supabase
+              .from('users')
+              .select('first_name, last_name, phone')
+              .eq('id', user.id)
+              .single();
+
+          if (userData['first_name'] == null ||
+              userData['first_name'].isEmpty) {
+            // User needs to set up their profile
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const ProfileSetupPage()),
+            );
+          } else {
+            // User already has a profile, go to home page
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const HomePage()),
+            );
+          }
+        } else {
+          // If for some reason we don't have a user, go to home page
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomePage()),
+          );
+        }
       }
     } on AuthException catch (error) {
       if (mounted) {
@@ -119,9 +144,33 @@ class _AuthPageState extends State<AuthPage> {
       );
 
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomePage()),
-        );
+        // Check if user exists in users table or needs profile setup
+        final user = supabase.auth.currentUser;
+        if (user != null) {
+          final userData = await supabase
+              .from('users')
+              .select('first_name, last_name, phone')
+              .eq('id', user.id)
+              .single();
+
+          if (userData['first_name'] == null ||
+              userData['first_name'].isEmpty) {
+            // User needs to set up their profile
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const ProfileSetupPage()),
+            );
+          } else {
+            // User already has a profile, go to home page
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const HomePage()),
+            );
+          }
+        } else {
+          // If for some reason we don't have a user, go to home page
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomePage()),
+          );
+        }
       }
     } on AuthException catch (error) {
       if (mounted) {
@@ -140,50 +189,11 @@ class _AuthPageState extends State<AuthPage> {
     }
   }
 
-  Future<void> _signInWithGoogle() async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-      // This needs to be implemented based on your Google auth configuration
-      await supabase.auth.signInWithOAuth(OAuthProvider.google,
-          redirectTo:
-              'https://kpceyekfdauxsbljihst.supabase.co/auth/v1/callback');
-      // Navigation will happen automatically on successful authentication via deep link
-    } catch (error) {
-      if (mounted) {
-        context.showSnackBar('Failed to sign in with Google', isError: true);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _signInWithApple() async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-      // This needs to be implemented based on your Apple auth configuration
-      await supabase.auth.signInWithOAuth(OAuthProvider.apple,
-          redirectTo:
-              'https://kpceyekfdauxsbljihst.supabase.co/auth/v1/callback');
-      // Navigation will happen automatically on successful authentication via deep link
-    } catch (error) {
-      if (mounted) {
-        context.showSnackBar('Failed to sign in with Apple', isError: true);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+  // Guest navigation function
+  void _continueAsGuest() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const HomePage()),
+    );
   }
 
   void _switchMode(AuthMode mode) {
@@ -480,58 +490,27 @@ class _AuthPageState extends State<AuthPage> {
 
                   const SizedBox(height: 24),
 
-                  // Social login buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Google button
-                      ElevatedButton(
-                        onPressed: _signInWithGoogle,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 12, horizontal: 24),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: BorderSide(color: Colors.grey.shade300),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.g_mobiledata,
-                                size: 24, color: Colors.red.shade700),
-                            const SizedBox(width: 8),
-                            const Text('Google'),
-                          ],
-                        ),
+                  // Replace social login buttons with Continue as Guest
+                  ElevatedButton(
+                    onPressed: _continueAsGuest,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade200,
+                      foregroundColor: Colors.black87,
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(color: Colors.grey.shade300),
                       ),
-
-                      const SizedBox(width: 16),
-
-                      // Apple button
-                      ElevatedButton(
-                        onPressed: _signInWithApple,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 12, horizontal: 24),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.apple, size: 24),
-                            SizedBox(width: 8),
-                            Text('Apple'),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.person_outline, size: 24),
+                        SizedBox(width: 8),
+                        Text('Continue as Guest'),
+                      ],
+                    ),
                   ),
                 ],
               ),

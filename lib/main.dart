@@ -20,6 +20,11 @@ Future<void> main() async {
 
 final supabase = Supabase.instance.client;
 
+// Add this function to check if user is signed in
+bool isUserSignedIn() {
+  return supabase.auth.currentUser != null;
+}
+
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
@@ -36,6 +41,39 @@ class MyApp extends ConsumerWidget {
           ? const AuthPage()
           : const HomePage(),
     );
+  }
+}
+
+class SplashPage extends StatefulWidget {
+  const SplashPage({super.key});
+
+  @override
+  _SplashPageState createState() => _SplashPageState();
+}
+
+class _SplashPageState extends State<SplashPage> {
+  @override
+  void initState() {
+    super.initState();
+    _redirect();
+  }
+
+  Future<void> _redirect() async {
+    // Wait for any initializations if needed
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    // Redirect to the appropriate page
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const HomePage()),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: implement build
+    throw UnimplementedError();
   }
 }
 
