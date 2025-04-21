@@ -66,7 +66,7 @@ class DealsNotifier extends _$DealsNotifier {
         'restaurant_id': restaurantId,
         'name': name,
         'description': description,
-        'savings': savings,
+        'savings': savings.toInt(),
         'created_at': DateTime.now().toIso8601String(),
       });
 
