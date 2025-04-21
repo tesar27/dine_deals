@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dine_deals/src/providers/deals_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final userNotifierProvider =
     StateNotifierProvider<UserNotifier, AsyncValue<Map<String, dynamic>?>>(
@@ -43,6 +45,9 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
   String _isSuperAdmin = 'false';
   bool _isLoading = true;
   List<Map<String, dynamic>> _deals = [];
+  bool _isFavorite = false; // Track if restaurant is favorited
+
+  final _supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -50,7 +55,126 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeProfile();
       _fetchDealsForRestaurant();
+      _checkFavoriteStatus();
     });
+  }
+
+  // Check if restaurant is in favorites
+  Future<void> _checkFavoriteStatus() async {
+    final restaurantId = widget.restaurant['id']?.toString();
+    if (restaurantId == null) return;
+
+    // Check local storage first for immediate UI update
+    final prefs = await SharedPreferences.getInstance();
+    final favorites = prefs.getStringList('favorites') ?? [];
+
+    setState(() {
+      _isFavorite = favorites.contains(restaurantId);
+    });
+
+    // Then verify with the server data
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        final response = await _supabase
+            .from('users')
+            .select('favorites')
+            .eq('id', user.id)
+            .single();
+
+        final serverFavorites = List<String>.from(response['favorites'] ?? []);
+
+        if (mounted) {
+          setState(() {
+            _isFavorite = serverFavorites.contains(restaurantId);
+          });
+
+          // Update local storage if it differs from server
+          if (_isFavorite != favorites.contains(restaurantId)) {
+            await prefs.setStringList('favorites', serverFavorites);
+          }
+        }
+      }
+    } catch (e) {
+      print('Error checking favorites: $e');
+    }
+  }
+
+  // Toggle favorite status
+  Future<void> _toggleFavorite() async {
+    final restaurantId = widget.restaurant['id']?.toString();
+    if (restaurantId == null) return;
+
+    // Optimistically update UI
+    setState(() {
+      _isFavorite = !_isFavorite;
+    });
+
+    try {
+      // Update local storage
+      final prefs = await SharedPreferences.getInstance();
+      final favorites = prefs.getStringList('favorites') ?? [];
+
+      if (_isFavorite) {
+        if (!favorites.contains(restaurantId)) {
+          favorites.add(restaurantId);
+        }
+      } else {
+        favorites.remove(restaurantId);
+      }
+
+      await prefs.setStringList('favorites', favorites);
+
+      // Update Supabase if user is logged in
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        // Get current favorites from the server first
+        final response = await _supabase
+            .from('users')
+            .select('favorites')
+            .eq('id', user.id)
+            .single();
+
+        List<String> serverFavorites = [];
+        if (response['favorites'] != null) {
+          serverFavorites = List<String>.from(response['favorites']);
+        }
+
+        if (_isFavorite) {
+          if (!serverFavorites.contains(restaurantId)) {
+            serverFavorites.add(restaurantId);
+          }
+        } else {
+          serverFavorites.remove(restaurantId);
+        }
+
+        // Update the server
+        await _supabase
+            .from('users')
+            .update({'favorites': serverFavorites}).eq('id', user.id);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              _isFavorite ? 'Added to favorites' : 'Removed from favorites'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      // Revert UI on error
+      setState(() {
+        _isFavorite = !_isFavorite;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating favorites: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      print('Error toggling favorite: $e');
+    }
   }
 
   void _initializeProfile() {
@@ -380,225 +504,230 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  height: 300,
-                  child: Stack(
-                    children: [
-                      // Restaurant image
-                      Positioned.fill(
-                        child: Image.network(
-                          widget.restaurant['imageUrl'] ??
-                              'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-                          width: double.infinity,
-                          height: 300,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: double.infinity,
-                              height: 300,
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.restaurant,
-                                  color: Colors.grey, size: 64),
-                            );
-                          },
+      body: RefreshIndicator(
+        onRefresh: _refreshPlaceDetails,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 300,
+                    child: Stack(
+                      children: [
+                        // Restaurant image
+                        Positioned.fill(
+                          child: Image.network(
+                            widget.restaurant['imageUrl'] ??
+                                'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+                            width: double.infinity,
+                            height: 300,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: double.infinity,
+                                height: 300,
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.restaurant,
+                                    color: Colors.grey, size: 64),
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                      // Gradient overlay at the bottom
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: 60,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.white.withOpacity(0.0),
-                                Colors.white.withOpacity(0.7),
-                                Colors.white,
-                              ],
-                              stops: const [0.0, 0.7, 1.0],
+                        // Gradient overlay at the bottom
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: 60,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.white.withOpacity(0.0),
+                                  Colors.white.withOpacity(0.7),
+                                  Colors.white,
+                                ],
+                                stops: const [0.0, 0.7, 1.0],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Center(
-                    child: Text(
-                      widget.restaurant['name'] ?? 'Restaurant Name',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 18),
-                      Text(
-                        ' ${widget.restaurant['rating'] ?? 'N/A'}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      Text(
-                        ' • ',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[700],
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Center(
+                      child: Text(
+                        widget.restaurant['name'] ?? 'Restaurant Name',
+                        style: const TextStyle(
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                      Text(
-                        '${widget.restaurant['hours'] ?? '9 AM - 9 PM'}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      Text(
-                        ' • ',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Min ${widget.restaurant['minOrder'] ?? '15 EUR'}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on,
-                          color: Colors.grey[700], size: 18),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          widget.restaurant['address'] ??
-                              'No address available',
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 18),
+                        Text(
+                          ' ${widget.restaurant['rating'] ?? 'N/A'}',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[700],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  // Action Buttons Row (Menu, Favorite, Share)
-                  Row(
-                    children: [
-                      // Menu Button (75% width)
-                      Expanded(
-                        flex: 75,
-                        child: ElevatedButton.icon(
-                          icon:
-                              const Icon(Icons.menu_book, color: Colors.black),
-                          label: const Text(
-                            'Menu',
+                        Text(
+                          ' • ',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${widget.restaurant['hours'] ?? '9 AM - 9 PM'}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        Text(
+                          ' • ',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Min ${widget.restaurant['minOrder'] ?? '15 EUR'}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on,
+                            color: Colors.grey[700], size: 18),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            widget.restaurant['address'] ??
+                                'No address available',
                             style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          onPressed: () => _showMenuBottomSheet(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                              side: BorderSide(color: Colors.grey.shade300),
+                              fontSize: 16,
+                              color: Colors.grey[700],
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Favorite Button
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.grey.shade300),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // Action Buttons Row (Menu, Favorite, Share)
+                    Row(
+                      children: [
+                        // Menu Button (75% width)
+                        Expanded(
+                          flex: 75,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.menu_book,
+                                color: Colors.black),
+                            label: const Text(
+                              'Menu',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            onPressed: () => _showMenuBottomSheet(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                                side: BorderSide(color: Colors.grey.shade300),
+                              ),
+                            ),
+                          ),
                         ),
-                        child: IconButton(
-                          icon: const Icon(Icons.favorite_border,
-                              color: Colors.black),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Added to favorites')),
-                            );
-                          },
+                        const SizedBox(width: 8),
+                        // Favorite Button
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: IconButton(
+                            icon: Icon(
+                              _isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: _isFavorite ? Colors.red : Colors.black,
+                            ),
+                            onPressed: _toggleFavorite,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Share Button
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.grey.shade300),
+                        const SizedBox(width: 8),
+                        // Share Button
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.share, color: Colors.black),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('Share functionality triggered')),
+                              );
+                            },
+                          ),
                         ),
-                        child: IconButton(
-                          icon: const Icon(Icons.share, color: Colors.black),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text('Share functionality triggered')),
-                            );
-                          },
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Offers',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.titleLarge?.color,
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Offers',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).textTheme.titleLarge?.color,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildDealsList(),
-                ],
+                    const SizedBox(height: 8),
+                    _buildDealsList(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -692,6 +821,21 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  // Add this method to your class
+  Future<void> _refreshPlaceDetails() async {
+    await Future.wait([
+      _fetchDealsForRestaurant(),
+      _checkFavoriteStatus(),
+    ]);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Place details refreshed'),
+        duration: Duration(seconds: 1),
+      ),
     );
   }
 }

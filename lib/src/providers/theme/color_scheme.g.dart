@@ -2,60 +2,60 @@ import 'package:flutter/material.dart';
 
 const lightColorScheme = ColorScheme(
   brightness: Brightness.light,
-  primary: Color(0xFF6750A4),
-  onPrimary: Color(0xFFFFFFFF),
-  primaryContainer: Color(0xFFEADDFF),
-  onPrimaryContainer: Color(0xFF21005D),
-  secondary: Color(0xFF625B71),
-  onSecondary: Color(0xFFFFFFFF),
-  secondaryContainer: Color(0xFFE8DEF8),
-  onSecondaryContainer: Color(0xFF1D192B),
-  tertiary: Color(0xFF7D5260),
-  onTertiary: Color(0xFFFFFFFF),
-  tertiaryContainer: Color(0xFFFFD8E4),
-  onTertiaryContainer: Color(0xFF31111D),
-  error: Color(0xFFB3261E),
-  onError: Color(0xFFFFFFFF),
-  errorContainer: Color(0xFFF9DEDC),
-  onErrorContainer: Color(0xFF410E0B),
-  outline: Color(0xFF79747E),
-  surface: Color(0xFFFFFBFE),
-  onSurface: Color(0xFF1C1B1F),
-  surfaceContainerHighest: Color(0xFFE7E0EC),
-  onSurfaceVariant: Color(0xFF49454F),
-  inverseSurface: Color(0xFF313033),
-  onInverseSurface: Color(0xFFF4EFF4),
-  inversePrimary: Color(0xFFD0BCFF),
-  shadow: Color(0xFF000000),
-  surfaceTint: Color(0xFF6750A4),
+  primary: Color(0xFFFF8C00), // Orange color
+  onPrimary: Color(0xFFFFFFFF), // White text on orange
+  primaryContainer: Color(0xFFFFE0B2), // Light orange container
+  onPrimaryContainer: Color(0xFF331800), // Dark brown on light orange
+  secondary: Color(0xFF9E9E9E), // Gray for secondary elements
+  onSecondary: Color(0xFFFFFFFF), // White text on gray
+  secondaryContainer: Color(0xFFF5F5F5), // Very light gray container
+  onSecondaryContainer: Color(0xFF1D1B16), // Dark text on light gray
+  tertiary: Color(0xFFDD7530), // Darker orange variant
+  onTertiary: Color(0xFFFFFFFF), // White text on dark orange
+  tertiaryContainer: Color(0xFFFFDBCB), // Very light orange container
+  onTertiaryContainer: Color(0xFF331D00), // Dark text on light container
+  error: Color(0xFFB3261E), // Standard error color
+  onError: Color(0xFFFFFFFF), // White text on error
+  errorContainer: Color(0xFFF9DEDC), // Light error container
+  onErrorContainer: Color(0xFF410E0B), // Dark text on error container
+  outline: Color(0xFF79747E), // Standard outline color
+  surface: Color(0xFFFFFBFE), // White surface
+  onSurface: Color(0xFF1C1B1F), // Black text on surface
+  surfaceContainerHighest: Color(0xFFE0E0E0), // Light gray for container areas
+  onSurfaceVariant: Color(0xFF49454F), // Dark gray for secondary text
+  inverseSurface: Color(0xFF313033), // Dark inverse surface
+  onInverseSurface: Color(0xFFF4EFF4), // Light text on inverse surface
+  inversePrimary: Color(0xFFFFAB40), // Light orange for inverse
+  shadow: Color(0xFF000000), // Standard shadow
+  surfaceTint: Color(0xFFFF8C00), // Orange tint
 );
 
 const darkColorScheme = ColorScheme(
   brightness: Brightness.dark,
-  primary: Color(0xFFD0BCFF),
-  onPrimary: Color(0xFF381E72),
-  primaryContainer: Color(0xFF4F378B),
-  onPrimaryContainer: Color(0xFFEADDFF),
-  secondary: Color(0xFFCCC2DC),
-  onSecondary: Color(0xFF332D41),
-  secondaryContainer: Color(0xFF4A4458),
-  onSecondaryContainer: Color(0xFFE8DEF8),
-  tertiary: Color(0xFFEFB8C8),
-  onTertiary: Color(0xFF492532),
-  tertiaryContainer: Color(0xFF633B48),
-  onTertiaryContainer: Color(0xFFFFD8E4),
-  error: Color(0xFFF2B8B5),
-  onError: Color(0xFF601410),
-  errorContainer: Color(0xFF8C1D18),
-  onErrorContainer: Color(0xFFF9DEDC),
-  outline: Color(0xFF938F99),
-  surface: Color(0xFF1C1B1F),
-  onSurface: Color(0xFFE6E1E5),
-  surfaceContainerHighest: Color(0xFF49454F),
-  onSurfaceVariant: Color(0xFFCAC4D0),
-  inverseSurface: Color(0xFFE6E1E5),
-  onInverseSurface: Color(0xFF313033),
-  inversePrimary: Color(0xFF6750A4),
-  shadow: Color(0xFF000000),
-  surfaceTint: Color(0xFFD0BCFF),
+  primary: Color(0xFFFF9800), // Orange color for dark mode
+  onPrimary: Color(0xFF000000), // Black text on orange buttons
+  primaryContainer: Color(0xFF5C4200), // Dark orange container
+  onPrimaryContainer: Color(0xFFFFE0B2), // Light orange text on dark container
+  secondary: Color(0xFF757575), // Gray for secondary elements
+  onSecondary: Color(0xFF000000), // Black text on gray
+  secondaryContainer: Color(0xFF4A4458), // Darker gray container
+  onSecondaryContainer: Color(0xFFE8DEF8), // Light text on dark container
+  tertiary: Color(0xFFFFB74D), // Light orange for tertiary
+  onTertiary: Color(0xFF000000), // Black text on light orange
+  tertiaryContainer: Color(0xFF633B00), // Dark container
+  onTertiaryContainer: Color(0xFFFFDBCB), // Light text on dark container
+  error: Color(0xFFF2B8B5), // Standard error for dark mode
+  onError: Color(0xFF601410), // Dark text on error
+  errorContainer: Color(0xFF8C1D18), // Dark error container
+  onErrorContainer: Color(0xFFF9DEDC), // Light text on error container
+  outline: Color(0xFF938F99), // Standard outline for dark
+  surface: Color(0xFF1C1B1F), // Dark surface
+  onSurface: Color(0xFFE6E1E5), // Light text on surface
+  surfaceContainerHighest: Color(0xFF424242), // Dark gray container
+  onSurfaceVariant: Color(0xFFCAC4D0), // Light gray text
+  inverseSurface: Color(0xFFE6E1E5), // Light inverse surface
+  onInverseSurface: Color(0xFF313033), // Dark text on light surface
+  inversePrimary: Color(0xFFFF8C00), // Orange for inverse primary
+  shadow: Color(0xFF000000), // Standard shadow
+  surfaceTint: Color(0xFFFF9800), // Orange tint
 );

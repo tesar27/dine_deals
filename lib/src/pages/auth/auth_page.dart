@@ -223,6 +223,10 @@ class _AuthPageState extends State<AuthPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the current theme to determine if we're in dark mode
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -233,13 +237,14 @@ class _AuthPageState extends State<AuthPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Logo or App Name
-                  const Icon(Icons.restaurant, size: 80, color: Colors.orange),
+                  Icon(Icons.restaurant, size: 80, color: colorScheme.primary),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Dine Deals',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -247,7 +252,9 @@ class _AuthPageState extends State<AuthPage> {
                   // Auth mode selector tabs
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
+                      color: isDarkMode
+                          ? colorScheme.surfaceContainerHighest
+                          : Colors.grey.shade200,
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: Row(
@@ -259,7 +266,7 @@ class _AuthPageState extends State<AuthPage> {
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
                                 color: _currentMode == AuthMode.signIn
-                                    ? Colors.orange
+                                    ? colorScheme.primary
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(30),
                               ),
@@ -269,8 +276,8 @@ class _AuthPageState extends State<AuthPage> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: _currentMode == AuthMode.signIn
-                                        ? Colors.white
-                                        : Colors.black54,
+                                        ? colorScheme.onPrimary
+                                        : colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ),
@@ -284,7 +291,7 @@ class _AuthPageState extends State<AuthPage> {
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
                                 color: _currentMode == AuthMode.signUp
-                                    ? Colors.orange
+                                    ? colorScheme.primary
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(30),
                               ),
@@ -294,8 +301,8 @@ class _AuthPageState extends State<AuthPage> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: _currentMode == AuthMode.signUp
-                                        ? Colors.white
-                                        : Colors.black54,
+                                        ? colorScheme.onPrimary
+                                        : colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ),
@@ -311,11 +318,13 @@ class _AuthPageState extends State<AuthPage> {
                   // Main form fields
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.2),
+                          color: isDarkMode
+                              ? Colors.black26
+                              : Colors.grey.withOpacity(0.2),
                           spreadRadius: 2,
                           blurRadius: 7,
                           offset: const Offset(0, 3),
@@ -332,9 +341,10 @@ class _AuthPageState extends State<AuthPage> {
                               : _currentMode == AuthMode.signUp
                                   ? 'Create Account'
                                   : 'Reset Password',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -345,7 +355,8 @@ class _AuthPageState extends State<AuthPage> {
                           controller: _emailController,
                           decoration: InputDecoration(
                             labelText: 'Email',
-                            prefixIcon: const Icon(Icons.email_outlined),
+                            prefixIcon: Icon(Icons.email_outlined,
+                                color: colorScheme.primary),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -361,7 +372,8 @@ class _AuthPageState extends State<AuthPage> {
                             controller: _passwordController,
                             decoration: InputDecoration(
                               labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock_outline),
+                              prefixIcon: Icon(Icons.lock_outline,
+                                  color: colorScheme.primary),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -377,7 +389,8 @@ class _AuthPageState extends State<AuthPage> {
                             controller: _otpController,
                             decoration: InputDecoration(
                               labelText: 'Enter OTP Code',
-                              prefixIcon: const Icon(Icons.pin),
+                              prefixIcon:
+                                  Icon(Icons.pin, color: colorScheme.primary),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -412,20 +425,20 @@ class _AuthPageState extends State<AuthPage> {
                                   }
                                 },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.onPrimary,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
                           child: _isLoading
-                              ? const SizedBox(
+                              ? SizedBox(
                                   height: 20,
                                   width: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Colors.white,
+                                    color: colorScheme.onPrimary,
                                   ),
                                 )
                               : Text(
@@ -444,17 +457,23 @@ class _AuthPageState extends State<AuthPage> {
                           const SizedBox(height: 16),
                           TextButton(
                             onPressed: _tryAgain,
-                            child: const Text('Try Again'),
+                            child: Text(
+                              'Try Again',
+                              style: TextStyle(color: colorScheme.primary),
+                            ),
                           ),
                         ],
 
                         // Forgot password link
                         if (_currentMode == AuthMode.signIn && !_isSent) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           TextButton(
                             onPressed: () =>
                                 _switchMode(AuthMode.forgotPassword),
-                            child: const Text('Forgot Password?'),
+                            child: Text(
+                              'Forgot Password?',
+                              style: TextStyle(color: colorScheme.primary),
+                            ),
                           ),
                         ],
 
@@ -464,27 +483,34 @@ class _AuthPageState extends State<AuthPage> {
                           const SizedBox(height: 12),
                           TextButton(
                             onPressed: () => _switchMode(AuthMode.signIn),
-                            child: const Text('Back to Sign In'),
+                            child: Text(
+                              'Back to Sign In',
+                              style: TextStyle(color: colorScheme.primary),
+                            ),
                           ),
                         ],
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
                   // OR Divider
                   Row(
                     children: [
-                      const Expanded(child: Divider(thickness: 1)),
+                      Expanded(
+                          child: Divider(
+                              thickness: 1, color: colorScheme.outline)),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           'OR',
-                          style: TextStyle(color: Colors.grey.shade600),
+                          style: TextStyle(color: colorScheme.outline),
                         ),
                       ),
-                      const Expanded(child: Divider(thickness: 1)),
+                      Expanded(
+                          child: Divider(
+                              thickness: 1, color: colorScheme.outline)),
                     ],
                   ),
 
@@ -494,21 +520,26 @@ class _AuthPageState extends State<AuthPage> {
                   ElevatedButton(
                     onPressed: _continueAsGuest,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade200,
-                      foregroundColor: Colors.black87,
+                      backgroundColor: isDarkMode
+                          ? colorScheme.surfaceContainerHighest
+                          : Colors.grey.shade200,
+                      foregroundColor: colorScheme.onSurfaceVariant,
                       padding: const EdgeInsets.symmetric(
                           vertical: 12, horizontal: 24),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(color: Colors.grey.shade300),
+                        side: BorderSide(
+                            color: isDarkMode
+                                ? colorScheme.outline
+                                : Colors.grey.shade300),
                       ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.person_outline, size: 24),
-                        SizedBox(width: 8),
-                        Text('Continue as Guest'),
+                        const SizedBox(width: 8),
+                        const Text('Continue as Guest'),
                       ],
                     ),
                   ),

@@ -85,7 +85,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   }
 
   void _navigateToSignIn() {
-    Navigator.of(context).push(AuthPage.route());
+    Navigator.of(context).pushReplacement(AuthPage.route());
   }
 
   @override
@@ -292,8 +292,10 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                         ElevatedButton(
                           onPressed: _navigateToSignIn,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
+                            backgroundColor:
+                                Theme.of(context).colorScheme.primary,
+                            foregroundColor:
+                                Theme.of(context).colorScheme.onPrimary,
                             padding: const EdgeInsets.symmetric(
                                 vertical: 16, horizontal: 32),
                             shape: RoundedRectangleBorder(
