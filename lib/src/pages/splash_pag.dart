@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dine_deals/src/utils/constants.dart';
 import 'package:dine_deals/main.dart';
-import 'package:dine_deals/src/pages/auth/otp_signup_page.dart';
+import 'package:dine_deals/src/pages/auth/auth_page.dart';
 import 'package:dine_deals/src/pages/home/account_page.dart';
 
 /// Page to redirect users to the appropriate page depending on the initial auth state
@@ -26,7 +26,7 @@ class SplashPageState extends State<SplashPage> {
     final session = supabase.auth.currentSession;
     if (session == null) {
       Navigator.of(context)
-          .pushAndRemoveUntil(OtpSignupPage.route(), (route) => false);
+          .pushAndRemoveUntil(AuthPage.route(), (route) => false);
     } else {
       Navigator.of(context)
           .pushAndRemoveUntil(AccountPage.route(), (route) => false);

@@ -5,7 +5,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:dine_deals/src/providers/restaurants_provider.dart';
 import 'package:dine_deals/src/providers/cities_provider.dart';
-import 'package:dine_deals/src/providers/location_provider.dart';
 
 class MapWidget extends ConsumerStatefulWidget {
   final Function(String)? onMarkerTapped;

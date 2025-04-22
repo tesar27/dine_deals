@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>development</string>
+    <key>teamID</key>
+    <string>72T58MDJZ9</string> <!-- Your team ID from the project file -->
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.yerbolat.dinedeals</key>
+        <string>Your Provisioning Profile Name</string>
+    </dict>
+</dict>
+</plist>
