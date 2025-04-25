@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:dine_deals/src/pages/auth/profile_setup_page.dart';
 import 'package:dine_deals/src/pages/home/home_page.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/main.dart';
 
@@ -19,7 +21,7 @@ class AuthPage extends StatefulWidget {
 enum AuthMode { signIn, signUp, forgotPassword }
 
 class _AuthPageState extends State<AuthPage> {
-  bool _isLoading = false;
+  bool _isLoading = true; // Start with loading to check auth status
   bool _isSent = false;
   // ignore: unused_field
   bool _hasError = false;
@@ -29,8 +31,127 @@ class _AuthPageState extends State<AuthPage> {
       TextEditingController();
 
   // Auth mode controls which form is shown
-
   AuthMode _currentMode = AuthMode.signIn;
+
+  @override
+  void initState() {
+    super.initState();
+    // Check for existing authentication when the page loads
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    try {
+      // First check if we have cached user data (this is faster than checking Supabase)
+      final prefs = await SharedPreferences.getInstance();
+      final userData = prefs.getString('user_data');
+
+      if (userData != null) {
+        // We have cached user data
+        final user = jsonDecode(userData);
+
+        // Check if cache is not too old (optional, e.g. 30 days)
+        final lastSignIn = DateTime.parse(user['last_sign_in']);
+        final now = DateTime.now();
+        final difference = now.difference(lastSignIn).inDays;
+
+        if (difference <= 30) {
+          // Cache is valid for 30 days
+          try {
+            // Try to get user profile to verify authentication is still valid
+            await supabase
+                .from('users')
+                .select('id, first_name, last_name')
+                .eq('id', user['id'])
+                .single();
+
+            // If we got here, the user is authenticated via cache
+            await _redirectAuthenticatedUser();
+            return;
+          } catch (e) {
+            // Cache is invalid, will continue to check Supabase session
+            await prefs.remove('user_data');
+            debugPrint('Cache validation failed: $e');
+          }
+        } else {
+          // Cache is too old, remove it
+          await prefs.remove('user_data');
+        }
+      }
+
+      // If cache didn't work, check if there's a current session
+      final session = supabase.auth.currentSession;
+
+      if (session != null) {
+        // User is authenticated via Supabase session
+        await _redirectAuthenticatedUser();
+        return;
+      }
+
+      // If we get here, user is not authenticated
+    } catch (e) {
+      debugPrint('Error checking authentication: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _redirectAuthenticatedUser() async {
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      // Cache user data for faster future authentication checks
+      _cacheUserData(user);
+
+      try {
+        // Check if user has a profile
+        final userData = await supabase
+            .from('users')
+            .select('first_name, last_name, phone')
+            .eq('id', user.id)
+            .single();
+
+        if (mounted) {
+          if (userData['first_name'] == null ||
+              userData['first_name'].isEmpty) {
+            // User needs to set up profile
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const ProfileSetupPage()),
+            );
+          } else {
+            // User has a profile, go to home
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const HomePage()),
+            );
+          }
+        }
+      } catch (e) {
+        // If error checking profile, direct to profile setup
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const ProfileSetupPage()),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _cacheUserData(User user) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userData = {
+        'id': user.id,
+        'email': user.email,
+        'last_sign_in': DateTime.now().toIso8601String(),
+      };
+      await prefs.setString('user_data', jsonEncode(userData));
+    } catch (e) {
+      debugPrint('Error caching user data: $e');
+    }
+  }
 
   Future<void> _sendOTP() async {
     try {
@@ -80,34 +201,15 @@ class _AuthPageState extends State<AuthPage> {
             ? OtpType.recovery
             : OtpType.email,
       );
-      if (mounted) {
-        // Check if user exists in users table or needs profile setup
-        final user = supabase.auth.currentUser;
-        if (user != null) {
-          final userData = await supabase
-              .from('users')
-              .select('first_name, last_name, phone')
-              .eq('id', user.id)
-              .single();
 
-          if (userData['first_name'] == null ||
-              userData['first_name'].isEmpty) {
-            // User needs to set up their profile
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const ProfileSetupPage()),
-            );
-          } else {
-            // User already has a profile, go to home page
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const HomePage()),
-            );
-          }
-        } else {
-          // If for some reason we don't have a user, go to home page
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomePage()),
-          );
-        }
+      // Cache user data after successful authentication
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        await _cacheUserData(user);
+      }
+
+      if (mounted) {
+        await _redirectAuthenticatedUser();
       }
     } on AuthException catch (error) {
       if (mounted) {
@@ -143,34 +245,14 @@ class _AuthPageState extends State<AuthPage> {
         password: _passwordController.text,
       );
 
-      if (mounted) {
-        // Check if user exists in users table or needs profile setup
-        final user = supabase.auth.currentUser;
-        if (user != null) {
-          final userData = await supabase
-              .from('users')
-              .select('first_name, last_name, phone')
-              .eq('id', user.id)
-              .single();
+      // Cache user data after successful authentication
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        await _cacheUserData(user);
+      }
 
-          if (userData['first_name'] == null ||
-              userData['first_name'].isEmpty) {
-            // User needs to set up their profile
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const ProfileSetupPage()),
-            );
-          } else {
-            // User already has a profile, go to home page
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const HomePage()),
-            );
-          }
-        } else {
-          // If for some reason we don't have a user, go to home page
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomePage()),
-          );
-        }
+      if (mounted) {
+        await _redirectAuthenticatedUser();
       }
     } on AuthException catch (error) {
       if (mounted) {
@@ -226,6 +308,15 @@ class _AuthPageState extends State<AuthPage> {
     // Get the current theme to determine if we're in dark mode
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
+
+    // Show loading indicator while checking authentication
+    if (_isLoading && !_isSent) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: colorScheme.primary),
+        ),
+      );
+    }
 
     return Scaffold(
       body: SafeArea(

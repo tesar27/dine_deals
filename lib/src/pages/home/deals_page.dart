@@ -21,18 +21,23 @@ class DealsPage extends ConsumerStatefulWidget {
 class _DealsPageState extends ConsumerState<DealsPage> {
   static const String _cityPreferenceKey = 'chosen_city';
   static const String _filtersPreferenceKey = 'selected_filters';
+  static const double _maxDistanceKm =
+      30.0; // Maximum distance for filtering in kilometers
+
   String _chosenCity = 'Choose your city';
   bool _iconTapped = false;
   bool _isMapView = false;
   List<String> _selectedCategories = ["All"]; // Default to "All"
   List<Map<String, dynamic>> _filteredRestaurants = [];
   bool _isLoadingRestaurants = false;
+  Position? _currentPosition; // Store user's current position
 
   @override
   void initState() {
     super.initState();
     _loadSavedCity();
     _loadSavedFilters();
+    _getCurrentPosition(); // Get user position when page initializes
   }
 
   @override
@@ -42,6 +47,61 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     if (_chosenCity != 'Choose your city') {
       _fetchFilteredRestaurants();
     }
+  }
+
+  // Get user's current position
+  Future<void> _getCurrentPosition() async {
+    try {
+      final locationProvider = ref.read(locationNotifierProvider.notifier);
+      await locationProvider.refreshLocation();
+      final position = await ref.read(locationNotifierProvider.future);
+
+      setState(() {
+        _currentPosition = position;
+      });
+
+      // If restaurants are already loaded, update with distance calculations
+      if (_filteredRestaurants.isNotEmpty) {
+        _updateRestaurantsWithDistance();
+      }
+    } catch (error) {
+      print("Error getting current position: $error");
+      // Don't update state or show error - just continue without position
+    }
+  }
+
+  // Update restaurants with distance from current position
+  void _updateRestaurantsWithDistance() {
+    if (_currentPosition == null) return;
+
+    setState(() {
+      for (var restaurant in _filteredRestaurants) {
+        if (restaurant['latitude'] != null && restaurant['longitude'] != null) {
+          double restaurantLat =
+              double.tryParse(restaurant['latitude'].toString()) ?? 0;
+          double restaurantLng =
+              double.tryParse(restaurant['longitude'].toString()) ?? 0;
+
+          final distance = Distance().as(
+            LengthUnit.Kilometer,
+            LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+            LatLng(restaurantLat, restaurantLng),
+          );
+
+          restaurant['distance'] = distance;
+        } else {
+          restaurant['distance'] = double.infinity;
+        }
+      }
+
+      // Filter restaurants within radius and sort by distance
+      _filteredRestaurants = _filteredRestaurants
+          .where((restaurant) =>
+              (restaurant['distance'] ?? double.infinity) <= _maxDistanceKm)
+          .toList()
+        ..sort((a, b) => (a['distance'] ?? double.infinity)
+            .compareTo(b['distance'] ?? double.infinity));
+    });
   }
 
 // Load city from SharedPreferences
@@ -425,6 +485,37 @@ class _DealsPageState extends ConsumerState<DealsPage> {
         }
       }
 
+      // Calculate distance for each restaurant if user position is available
+      if (_currentPosition != null) {
+        for (var restaurant in restaurantsWithDeals) {
+          if (restaurant['latitude'] != null &&
+              restaurant['longitude'] != null) {
+            double restaurantLat =
+                double.tryParse(restaurant['latitude'].toString()) ?? 0;
+            double restaurantLng =
+                double.tryParse(restaurant['longitude'].toString()) ?? 0;
+
+            final distance = const Distance().as(
+              LengthUnit.Kilometer,
+              LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+              LatLng(restaurantLat, restaurantLng),
+            );
+
+            restaurant['distance'] = distance;
+          } else {
+            restaurant['distance'] = double.infinity;
+          }
+        }
+
+        // Filter restaurants within radius and sort by distance
+        restaurantsWithDeals = restaurantsWithDeals
+            .where((restaurant) =>
+                (restaurant['distance'] ?? double.infinity) <= _maxDistanceKm)
+            .toList()
+          ..sort((a, b) => (a['distance'] ?? double.infinity)
+              .compareTo(b['distance'] ?? double.infinity));
+      }
+
       setState(() {
         _filteredRestaurants = restaurantsWithDeals;
         _isLoadingRestaurants = false;
@@ -525,6 +616,11 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       await locationProvider.refreshLocation();
       final position = await ref.read(locationNotifierProvider.future);
 
+      // Save current position
+      setState(() {
+        _currentPosition = position;
+      });
+
       // Find the nearest city based on user's location
       await _findNearestCity(position);
     } catch (error) {
@@ -609,6 +705,8 @@ class _DealsPageState extends ConsumerState<DealsPage> {
               onMarkerTapped: (restaurantName) {},
               chosenCity: _chosenCity,
               isVisible: _isMapView,
+              restaurants:
+                  _filteredRestaurants, // Pass the filtered restaurants
             ),
           ),
 
@@ -646,7 +744,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                     : _filteredRestaurants.isEmpty
                         ? Center(
                             child: Text(
-                              'No restaurants found for the selected filters',
+                              'No restaurants found within 30km radius',
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           )
@@ -742,7 +840,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 8),
-                                            // Second row - Rating, address
+                                            // Second row - Rating, address, distance
                                             Row(
                                               children: [
                                                 const Icon(Icons.star,
@@ -750,6 +848,19 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                                                     color: Colors.amber),
                                                 Text(
                                                     ' ${restaurant['rating'] ?? '4.5'} · '),
+                                                // Show distance if available
+                                                if (restaurant['distance'] !=
+                                                    null)
+                                                  Row(
+                                                    children: [
+                                                      const Icon(
+                                                          Icons.directions,
+                                                          size: 16,
+                                                          color: Colors.blue),
+                                                      Text(
+                                                          ' ${(restaurant['distance'] as double).toStringAsFixed(1)} km · '),
+                                                    ],
+                                                  ),
                                                 const Icon(Icons.location_on,
                                                     size: 16,
                                                     color: Colors.grey),
@@ -765,59 +876,37 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                                             ),
                                             const SizedBox(height: 8),
                                             // Third row - Categories as offers
-                                            Wrap(
-                                              spacing: 8,
-                                              runSpacing: 8,
-                                              children: _getCategoriesAsList(
-                                                      restaurant)
-                                                  .map((category) {
-                                                return Container(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 4),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.green[100],
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            12),
-                                                  ),
-                                                  child: Text(
-                                                    category,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.black87,
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                  top: 8.0),
+                                              child: Wrap(
+                                                spacing: 8,
+                                                runSpacing: 8,
+                                                children:
+                                                    _getDealsAsList(restaurant)
+                                                        .map((deal) {
+                                                  return Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 4),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.green[100],
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              12),
                                                     ),
-                                                  ),
-                                                );
-                                              }).toList(),
-                                            ),
-                                            // Show deals count if available
-                                            if (restaurant['deals_count'] !=
-                                                    null &&
-                                                restaurant['deals_count'] > 0)
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                    top: 8.0),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(Icons.local_offer,
-                                                        size: 16,
-                                                        color:
-                                                            Colors.green[700]),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      '${restaurant['deals_count']} special ${restaurant['deals_count'] == 1 ? 'offer' : 'offers'} available',
-                                                      style: TextStyle(
-                                                        color:
-                                                            Colors.green[700],
-                                                        fontWeight:
-                                                            FontWeight.bold,
+                                                    child: Text(
+                                                      deal,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.black87,
                                                       ),
                                                     ),
-                                                  ],
-                                                ),
+                                                  );
+                                                }).toList(),
                                               ),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -933,6 +1022,26 @@ class _DealsPageState extends ConsumerState<DealsPage> {
         ],
       ),
     );
+  }
+
+  // Helper method to get deals as a list of titles
+  List<String> _getDealsAsList(Map<String, dynamic> restaurant) {
+    // Try to get deals from restaurant data
+    final deals = restaurant['deals'];
+
+    if (deals == null || (deals is List && deals.isEmpty)) {
+      // No deals, return empty list
+      return [];
+    } else if (deals is List) {
+      // Get the deal names, take first 3 deals only
+      return deals
+          .take(3)
+          .map((deal) => deal['name']?.toString() ?? 'Special Offer')
+          .toList();
+    }
+
+    // Fallback case
+    return [];
   }
 
   // Helper method to get a shortened address
