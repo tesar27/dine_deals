@@ -51,23 +51,25 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
   @override
   void didUpdateWidget(MapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.chosenCity != oldWidget.chosenCity &&
+    if ((widget.chosenCity != oldWidget.chosenCity || 
+        widget.isVisible != oldWidget.isVisible) &&
         widget.chosenCity != 'Choose your city') {
-      _centerOnChosenCity();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Use a slight delay to ensure the map is properly initialized
+      Future.delayed(Duration.zero, () {
         if (mounted) {
-          _mapController.move(
-              _mapController.camera.center, _mapController.camera.zoom);
+          _centerOnChosenCity();
         }
       });
     }
     if (widget.isVisible && !oldWidget.isVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _mapController.move(
-              _mapController.camera.center, _mapController.camera.zoom);
           if (widget.chosenCity != 'Choose your city') {
             _centerOnChosenCity();
+          } else {
+            // If no city is chosen, ensure the map reflects the current state
+            _mapController.move(
+                _mapController.camera.center, _mapController.camera.zoom);
           }
         }
       });
@@ -76,6 +78,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
   void _centerOnChosenCity() async {
     if (widget.chosenCity == 'Choose your city') return;
+    
+    print("Centering on city: ${widget.chosenCity}");
+    
     final citiesAsync = ref.read(citiesNotifierProvider);
 
     citiesAsync.whenData((cities) {
@@ -89,6 +94,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
           chosenCityData['longitude'] != null) {
         final lat = double.parse(chosenCityData['latitude'].toString());
         final lng = double.parse(chosenCityData['longitude'].toString());
+        
+        print("Moving map to coordinates: $lat, $lng");
+        
         _mapController.move(LatLng(lat, lng), _currentZoom);
       } else {
         final restaurantsAsync = ref.read(restaurantsNotifierProvider);
@@ -105,6 +113,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
             final lat = double.parse(cityRestaurants[0]['latitude'].toString());
             final lng =
                 double.parse(cityRestaurants[0]['longitude'].toString());
+                
+            print("Moving map to restaurant coordinates: $lat, $lng");
+            
             _mapController.move(LatLng(lat, lng), _currentZoom);
           }
         });
@@ -399,16 +410,19 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                                   accuracy: LocationAccuracy.high,
                                 ),
                               );
+                              final userLatLng = LatLng(position.latitude, position.longitude);
                               setState(() {
-                                _userLocation = LatLng(
-                                    position.latitude, position.longitude);
+                                _userLocation = userLatLng;
                                 _showUserLocation = true;
+                                // Update _currentZoom state when moving map
+                                _currentZoom = 15.0;
                               });
-                              _mapController.move(_userLocation!, 15.0);
+                              // Move map after state is updated
+                              _mapController.move(userLatLng, 15.0);
                             } catch (e) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Error: $e'),
+                                  content: Text('Error getting location: $e'), // Improved error message
                                   backgroundColor: Colors.red,
                                 ),
                               );

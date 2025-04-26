@@ -742,7 +742,8 @@ class _DealsPageState extends ConsumerState<DealsPage> {
               onMarkerTapped: (restaurantName) {},
               isVisible: _isMapView,
               restaurants: _filteredRestaurants,
-              chosenCity: '', // Pass the filtered restaurants
+              chosenCity:
+                  chosenCity, // Pass the actual chosen city instead of empty string
             ),
           ),
 
