@@ -758,8 +758,9 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Please select a city first',
+                              'Please select a city or view all cities on the map',
                               style: Theme.of(context).textTheme.titleLarge,
+                              textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 20),
                             ElevatedButton.icon(
