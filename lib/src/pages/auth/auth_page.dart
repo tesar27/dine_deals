@@ -625,12 +625,12 @@ class _AuthPageState extends State<AuthPage> {
                                 : Colors.grey.shade300),
                       ),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.person_outline, size: 24),
-                        const SizedBox(width: 8),
-                        const Text('Continue as Guest'),
+                        SizedBox(width: 8),
+                        Text('Continue as Guest'),
                       ],
                     ),
                   ),

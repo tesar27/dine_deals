@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dine_deals/src/providers/restaurants_provider.dart';
 import 'package:dine_deals/src/pages/details/edit_place_details.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class AdminPage extends ConsumerWidget {
   const AdminPage({super.key});
@@ -114,41 +116,73 @@ class AdminPage extends ConsumerWidget {
                   itemCount: restaurants.length,
                   itemBuilder: (context, index) {
                     final restaurant = restaurants[index];
-                    return InkWell(
-                      onTap: () {
-                        // Navigate to edit details page when restaurant is tapped
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EditPlaceDetails(
-                              restaurant: restaurant,
-                            ),
-                          ),
-                        ).then((_) {
-                          // Refresh the list when returning from edit page
-                          ref.invalidate(restaurantsNotifierProvider);
-                        });
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 8.0, horizontal: 16.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Left side - Image
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                restaurant['imageUrl'] ??
-                                    'https://kpceyekfdauxsbljihst.supabase.co/storage/v1/object/public/pictures//cheeseburger-7580676_1280.jpg',
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8.0, horizontal: 16.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Left side - Image with clickable behavior
+                          Stack(
+                            children: [
+                              GestureDetector(
+                                onTap: () => _pickAndUploadImage(
+                                    context, ref, restaurant),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    restaurant['imageUrl'] ??
+                                        'https://kpceyekfdauxsbljihst.supabase.co/storage/v1/object/public/pictures//cheeseburger-7580676_1280.jpg',
+                                    width: 100,
+                                    height: 100,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (ctx, err, _) => Container(
+                                      width: 100,
+                                      height: 100,
+                                      color: Colors.grey[300],
+                                      child:
+                                          const Icon(Icons.image_not_supported),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 16),
-                            // Right side - Information
-                            Expanded(
+                              // Overlay camera icon to indicate image is clickable
+                              Positioned(
+                                bottom: 8,
+                                right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.6),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.photo_camera,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 16),
+                          // Right side - Information (clickable to edit details)
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                // Navigate to edit details page when restaurant info is tapped
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => EditPlaceDetails(
+                                      restaurant: restaurant,
+                                    ),
+                                  ),
+                                ).then((_) {
+                                  // Refresh the list when returning from edit page
+                                  ref.invalidate(restaurantsNotifierProvider);
+                                });
+                              },
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -208,8 +242,8 @@ class AdminPage extends ConsumerWidget {
                                 ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -223,6 +257,71 @@ class AdminPage extends ConsumerWidget {
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  // Method to handle image picking and uploading
+  Future<void> _pickAndUploadImage(BuildContext context, WidgetRef ref,
+      Map<String, dynamic> restaurant) async {
+    final ImagePicker picker = ImagePicker();
+
+    try {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 1200,
+      );
+
+      if (image == null) {
+        // User cancelled the picker
+        return;
+      }
+
+      if (context.mounted) {
+        // Show loading indicator
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Uploading image...'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+
+      // Get the file path
+      final String filePath = image.path;
+      final File file = File(filePath);
+
+      // Upload the image using the provider
+      final String? newImageUrl = await ref
+          .read(restaurantsNotifierProvider.notifier)
+          .uploadImage(file, restaurantId: restaurant['id']);
+
+      if (newImageUrl != null && context.mounted) {
+        // Update the restaurant with new image URL
+        await ref
+            .read(restaurantsNotifierProvider.notifier)
+            .updateRestaurantImage(restaurant['id'], newImageUrl);
+
+        // Refresh the list
+        ref.invalidate(restaurantsNotifierProvider);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error picking or uploading image: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showAddPlaceDialog(BuildContext context, WidgetRef ref) {
@@ -260,6 +359,28 @@ class AdminPage extends ConsumerWidget {
 
                 if (name.isNotEmpty && address.isNotEmpty) {
                   try {
+                    debugPrint('Checking if place exists: $name, $address');
+                    // Check if restaurant with same name and address already exists
+                    final exists = await ref
+                        .read(restaurantsNotifierProvider.notifier)
+                        .checkPlaceExists(name: name, address: address);
+
+                    if (exists) {
+                      if (context.mounted) {
+                        // Close the dialog
+                        Navigator.pop(context);
+
+                        // Show already exists message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Place already exists!'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
                     debugPrint('Adding new place: $name, $address');
                     await ref
                         .read(restaurantsNotifierProvider.notifier)

@@ -2,9 +2,41 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 part 'cities_provider.g.dart';
 
+// The chosen city provider
+final chosenCityProvider = StateNotifierProvider<ChosenCityNotifier, String>(
+  (ref) => ChosenCityNotifier(),
+);
+
+class ChosenCityNotifier extends StateNotifier<String> {
+  static const String _cityPreferenceKey = 'chosen_city';
+
+  ChosenCityNotifier() : super('Choose your city') {
+    _loadSavedCity();
+  }
+
+  Future<void> _loadSavedCity() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedCity = prefs.getString(_cityPreferenceKey);
+    if (savedCity != null) {
+      state = savedCity;
+    }
+  }
+
+  Future<void> updateCity(String city) async {
+    if (city == state) return;
+
+    state = city;
+
+    // Save city to SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_cityPreferenceKey, city);
+  }
+}
+
+// Using the @riverpod annotation for CitiesNotifier
 @Riverpod(keepAlive: true)
 class CitiesNotifier extends _$CitiesNotifier {
   PostgrestList? _cachedData;
@@ -61,6 +93,30 @@ class CitiesNotifier extends _$CitiesNotifier {
       // Catch any other unexpected errors
       print("CitiesNotifier: An unexpected error occurred: $error");
       throw Exception('An unexpected error occurred while fetching user data.');
+    }
+  }
+
+  Future<void> refreshCities() async {
+    state = const AsyncValue.loading();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Fetch fresh data from Supabase
+      final citiesData = await Supabase.instance.client
+          .from('cities')
+          .select()
+          .order('name', ascending: true);
+
+      // Cache the data
+      await prefs.setString(_cacheKey, jsonEncode(citiesData));
+      print("CitiesNotifier: Refreshed and cached cities data");
+
+      // Update state with new data
+      _cachedData = citiesData;
+      state = AsyncData(citiesData);
+    } catch (error) {
+      print("CitiesNotifier: Failed to refresh cities: $error");
+      state = AsyncError(error, StackTrace.current);
     }
   }
 }

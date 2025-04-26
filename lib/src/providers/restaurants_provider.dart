@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:dine_deals/src/config/config.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,7 +20,7 @@ class RestaurantsNotifier extends _$RestaurantsNotifier {
     return fetchRestaurants();
   }
 
-  // Fetch the list of restaurants from Supabase with improved caching
+  // Fetch the list of restaurants from Supabase.instance.client with improved caching
   Future<List<Map<String, dynamic>>> fetchRestaurants(
       {bool forceRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
@@ -52,7 +54,8 @@ class RestaurantsNotifier extends _$RestaurantsNotifier {
     }
 
     try {
-      print("RestaurantsNotifier: Fetching restaurants from Supabase");
+      print(
+          "RestaurantsNotifier: Fetching restaurants from Supabase.instance.client");
       final placesData = await Supabase.instance.client
           .from('restaurants')
           .select()
@@ -100,7 +103,7 @@ class RestaurantsNotifier extends _$RestaurantsNotifier {
       // Step 1: Get coordinates from OpenCage API
       final coordinates = await _getCoordinatesFromAddress(address);
 
-      // Step 2: Save the new place in Supabase
+      // Step 2: Save the new place in Supabase.instance.client
       await Supabase.instance.client.from('restaurants').insert({
         'name': name,
         'address': address,
@@ -263,5 +266,77 @@ class RestaurantsNotifier extends _$RestaurantsNotifier {
   // Add this method to RestaurantsNotifier
   void updateFilteredResults(List<Map<String, dynamic>> filtered) {
     state = AsyncData(filtered);
+  }
+
+  // Check if a restaurant with the same name and address already exists
+  Future<bool> checkPlaceExists(
+      {required String name, required String address}) async {
+    try {
+      // Query based on both name and address
+      final result = await Supabase.instance.client
+          .from('restaurants')
+          .select()
+          .ilike('name', name)
+          .ilike('address', address);
+
+      // Return true if any results were found
+      return result.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking for existing place: $e');
+      return false; // In case of error, assume it doesn't exist
+    }
+  }
+
+  // Upload an image to Supabase.instance.client storage
+  Future<String?> uploadImage(File imageFile,
+      {required int restaurantId}) async {
+    try {
+      // Generate a unique filename with restaurant ID and timestamp
+      final String fileName =
+          'restaurant_${restaurantId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      // Upload file to Supabase.instance.client storage
+      await Supabase.instance.client.storage
+          .from('pictures')
+          .upload(fileName, imageFile);
+
+      // Get the public URL for the uploaded file
+      final String imageUrl = Supabase.instance.client.storage
+          .from('pictures')
+          .getPublicUrl(fileName);
+
+      debugPrint('Image uploaded successfully: $imageUrl');
+      return imageUrl;
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      throw 'Failed to upload image: $e';
+    }
+  }
+
+  // Update restaurant image URL in the database
+  Future<void> updateRestaurantImage(int restaurantId, String imageUrl) async {
+    try {
+      // Update the restaurant record in the database
+      await Supabase.instance.client
+          .from('restaurants')
+          .update({'imageUrl': imageUrl}).eq('id', restaurantId);
+
+      debugPrint('Restaurant image URL updated in database');
+
+      // Update the state to reflect the change without needing a full refresh
+      if (state.hasValue && state.value != null) {
+        final updatedList = state.value!.map((restaurant) {
+          if (restaurant['id'] == restaurantId) {
+            return {...restaurant, 'imageUrl': imageUrl};
+          }
+          return restaurant;
+        }).toList();
+
+        state = AsyncValue.data(updatedList);
+      }
+    } catch (e) {
+      debugPrint('Error updating restaurant image in database: $e');
+      throw 'Failed to update restaurant image in database: $e';
+    }
   }
 }

@@ -19,12 +19,10 @@ class DealsPage extends ConsumerStatefulWidget {
 }
 
 class _DealsPageState extends ConsumerState<DealsPage> {
-  static const String _cityPreferenceKey = 'chosen_city';
   static const String _filtersPreferenceKey = 'selected_filters';
   static const double _maxDistanceKm =
       30.0; // Maximum distance for filtering in kilometers
 
-  String _chosenCity = 'Choose your city';
   bool _iconTapped = false;
   bool _isMapView = false;
   List<String> _selectedCategories = ["All"]; // Default to "All"
@@ -32,19 +30,29 @@ class _DealsPageState extends ConsumerState<DealsPage> {
   bool _isLoadingRestaurants = false;
   Position? _currentPosition; // Store user's current position
 
+  // Add a flag to track if the component is being disposed
+  bool _isDisposed = false;
+
   @override
   void initState() {
     super.initState();
-    _loadSavedCity();
     _loadSavedFilters();
     _getCurrentPosition(); // Get user position when page initializes
+  }
+
+  @override
+  void dispose() {
+    // Mark as disposed to prevent setState calls
+    _isDisposed = true;
+    super.dispose();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     // If city is already loaded, fetch restaurants
-    if (_chosenCity != 'Choose your city') {
+    final chosenCity = ref.read(chosenCityProvider);
+    if (chosenCity != 'Choose your city') {
       _fetchFilteredRestaurants();
     }
   }
@@ -55,6 +63,9 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       final locationProvider = ref.read(locationNotifierProvider.notifier);
       await locationProvider.refreshLocation();
       final position = await ref.read(locationNotifierProvider.future);
+
+      // Check if widget is still mounted before updating state
+      if (!mounted || _isDisposed) return;
 
       setState(() {
         _currentPosition = position;
@@ -72,7 +83,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
   // Update restaurants with distance from current position
   void _updateRestaurantsWithDistance() {
-    if (_currentPosition == null) return;
+    if (_currentPosition == null || !mounted || _isDisposed) return;
 
     setState(() {
       for (var restaurant in _filteredRestaurants) {
@@ -82,7 +93,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
           double restaurantLng =
               double.tryParse(restaurant['longitude'].toString()) ?? 0;
 
-          final distance = Distance().as(
+          final distance = const Distance().as(
             LengthUnit.Kilometer,
             LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
             LatLng(restaurantLat, restaurantLng),
@@ -104,28 +115,10 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     });
   }
 
-// Load city from SharedPreferences
-  Future<void> _loadSavedCity() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedCity = prefs.getString(_cityPreferenceKey);
-    if (savedCity != null) {
-      setState(() {
-        _chosenCity = savedCity;
-      });
-      // Fetch restaurants after setting the city
-      _fetchFilteredRestaurants();
-    }
-  }
-
-  // Save city to SharedPreferences
-  Future<void> _saveCity(String city) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_cityPreferenceKey, city);
-    // Fetch restaurants with new city filter
-    _fetchFilteredRestaurants();
-  }
-
   void _showCitiesList(List<String> cities) {
+    // First, refresh cities to get the latest data
+    ref.read(citiesNotifierProvider.notifier).refreshCities();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -159,7 +152,19 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    // Close button on the right
+                    // Add refresh button
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: () {
+                          // Refresh cities data
+                          ref
+                              .read(citiesNotifierProvider.notifier)
+                              .refreshCities();
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -178,13 +183,16 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                         ),
                       ),
                       onTap: () {
+                        // Use the chosenCityProvider to update city
+                        ref
+                            .read(chosenCityProvider.notifier)
+                            .updateCity(cities[index]);
                         setState(() {
-                          _chosenCity = cities[index];
                           _iconTapped = false;
                         });
-                        // Save city when selected
-                        _saveCity(cities[index]);
                         Navigator.pop(context);
+                        // Fetch restaurants after choosing city
+                        _fetchFilteredRestaurants();
                       },
                     );
                   },
@@ -415,7 +423,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     );
   }
 
-// Save filters to SharedPreferences
+  // Save filters to SharedPreferences
   Future<void> _saveFilters(List<String> filters) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_filtersPreferenceKey, filters);
@@ -430,15 +438,17 @@ class _DealsPageState extends ConsumerState<DealsPage> {
         _selectedCategories = savedFilters;
       });
       // Fetch restaurants with saved filters if city is already selected
-      if (_chosenCity != 'Choose your city') {
+      final chosenCity = ref.read(chosenCityProvider);
+      if (chosenCity != 'Choose your city') {
         _fetchFilteredRestaurants();
       }
     }
   }
 
   Future<void> _fetchFilteredRestaurants() async {
+    final chosenCity = ref.read(chosenCityProvider);
     // Don't fetch if city isn't selected
-    if (_chosenCity == 'Choose your city') return;
+    if (chosenCity == 'Choose your city' || !mounted || _isDisposed) return;
 
     setState(() {
       _isLoadingRestaurants = true;
@@ -458,9 +468,12 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
       // Fetch filtered restaurants
       final results = await restaurantsNotifier.getFilteredRestaurants(
-        city: _chosenCity,
+        city: chosenCity, // Use the shared city state
         category: categoryFilter,
       );
+
+      // Check if still mounted before processing results
+      if (!mounted || _isDisposed) return;
 
       // For each restaurant, fetch its deals
       final dealsNotifier = ref.read(dealsNotifierProvider.notifier);
@@ -484,6 +497,9 @@ class _DealsPageState extends ConsumerState<DealsPage> {
           restaurantsWithDeals.add(restaurant);
         }
       }
+
+      // Check again if still mounted before updating state
+      if (!mounted || _isDisposed) return;
 
       // Calculate distance for each restaurant if user position is available
       if (_currentPosition != null) {
@@ -516,17 +532,21 @@ class _DealsPageState extends ConsumerState<DealsPage> {
               .compareTo(b['distance'] ?? double.infinity));
       }
 
+      // Final check if still mounted before updating state
+      if (!mounted || _isDisposed) return;
+
       setState(() {
         _filteredRestaurants = restaurantsWithDeals;
         _isLoadingRestaurants = false;
       });
     } catch (error) {
       print("Error fetching restaurants: $error");
-      setState(() {
-        _isLoadingRestaurants = false;
-      });
 
-      if (mounted) {
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _isLoadingRestaurants = false;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading restaurants: $error')),
         );
@@ -536,6 +556,8 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
   // Add a method to find the nearest city from user location
   Future<void> _findNearestCity(Position position) async {
+    if (!mounted || _isDisposed) return;
+
     setState(() {
       _isLoadingRestaurants = true;
     });
@@ -549,6 +571,9 @@ class _DealsPageState extends ConsumerState<DealsPage> {
         error: (error, stack) =>
             throw Exception('Error loading cities: $error'),
       );
+
+      // Check if still mounted before continuing
+      if (!mounted || _isDisposed) return;
 
       if (cities.isEmpty) {
         throw Exception('No cities available');
@@ -566,7 +591,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
         final cityLng = double.parse(city['longitude'].toString());
 
         // Calculate distance using the Distance class from latlong2 package
-        final distance = Distance().as(
+        final distance = const Distance().as(
           LengthUnit.Kilometer,
           LatLng(position.latitude, position.longitude),
           LatLng(cityLat, cityLng),
@@ -578,25 +603,31 @@ class _DealsPageState extends ConsumerState<DealsPage> {
         }
       }
 
-      // Update the chosen city
+      // Check if still mounted before updating state
+      if (!mounted || _isDisposed) return;
+
+      // Update the chosen city using the provider
       final cityName = nearestCity['name'] as String;
+      ref.read(chosenCityProvider.notifier).updateCity(cityName);
+
       setState(() {
-        _chosenCity = cityName;
         _isLoadingRestaurants = false;
       });
 
-      // Save city preference
-      await _saveCity(cityName);
+      // Fetch restaurants with the new city
+      _fetchFilteredRestaurants();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Nearest city found: $cityName')),
-      );
+      if (mounted && !_isDisposed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Nearest city found: $cityName')),
+        );
+      }
     } catch (error) {
-      setState(() {
-        _isLoadingRestaurants = false;
-      });
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _isLoadingRestaurants = false;
+        });
 
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error finding nearest city: $error')),
         );
@@ -607,6 +638,8 @@ class _DealsPageState extends ConsumerState<DealsPage> {
   // Method to request location and find nearest city
   Future<void> _locateUserAndFindCity() async {
     try {
+      if (!mounted || _isDisposed) return;
+
       setState(() {
         _isLoadingRestaurants = true;
       });
@@ -616,6 +649,9 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       await locationProvider.refreshLocation();
       final position = await ref.read(locationNotifierProvider.future);
 
+      // Check if still mounted before updating state
+      if (!mounted || _isDisposed) return;
+
       // Save current position
       setState(() {
         _currentPosition = position;
@@ -624,11 +660,11 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       // Find the nearest city based on user's location
       await _findNearestCity(position);
     } catch (error) {
-      setState(() {
-        _isLoadingRestaurants = false;
-      });
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _isLoadingRestaurants = false;
+        });
 
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error locating you: $error')),
         );
@@ -639,6 +675,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
   @override
   Widget build(BuildContext context) {
     final citiesAsync = ref.watch(citiesNotifierProvider);
+    final chosenCity = ref.watch(chosenCityProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -689,7 +726,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(_chosenCity),
+              Text(chosenCity), // Use the shared city state
             ],
           ),
         ),
@@ -701,12 +738,11 @@ class _DealsPageState extends ConsumerState<DealsPage> {
             visible: _isMapView,
             maintainState: true,
             child: MapWidget(
-              key: ValueKey(_chosenCity),
+              key: ValueKey(chosenCity), // Use the shared city state
               onMarkerTapped: (restaurantName) {},
-              chosenCity: _chosenCity,
               isVisible: _isMapView,
-              restaurants:
-                  _filteredRestaurants, // Pass the filtered restaurants
+              restaurants: _filteredRestaurants,
+              chosenCity: '', // Pass the filtered restaurants
             ),
           ),
 
@@ -715,7 +751,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
             maintainState: true,
             child: _isLoadingRestaurants
                 ? const Center(child: CircularProgressIndicator())
-                : _chosenCity == 'Choose your city'
+                : chosenCity == 'Choose your city' // Use the shared city state
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,

@@ -164,8 +164,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
     for (var city in cities) {
       final cityName = city['name'] as String?;
-      if (cityName == null || !restaurantsByCity.containsKey(cityName))
+      if (cityName == null || !restaurantsByCity.containsKey(cityName)) {
         continue;
+      }
 
       final restaurants = restaurantsByCity[cityName]!;
       if (restaurants.isEmpty) continue;
@@ -268,7 +269,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                             if (event.source == MapEventSource.mapController ||
                                 event.source ==
                                     MapEventSource.flingAnimationController ||
-                                event.source == MapEventSource.doubleTapZoom) {
+                                event.source ==
+                                    MapEventSource
+                                        .doubleTapZoomAnimationController) {
                               setState(() {
                                 _currentZoom = event.camera.zoom;
                               });
