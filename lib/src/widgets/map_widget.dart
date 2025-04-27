@@ -35,7 +35,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
   double _currentZoom = 13.0;
   // Change the threshold from 10.0 to 13.0 to show clusters until more zoomed in
   static const double _cityClusterZoomThreshold = 13.0;
-  
+
   // Track if all restaurants are loaded
   bool _allRestaurantsLoaded = false;
   List<Map<String, dynamic>> _allRestaurants = [];
@@ -50,7 +50,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
           _loadAllRestaurants();
           if (widget.chosenCity != 'Choose your city') {
             _centerOnChosenCity();
-            
+
             // If a city is chosen, set zoom to just above threshold to show individual restaurants
             setState(() {
               _currentZoom = _cityClusterZoomThreshold + 0.5;
@@ -69,29 +69,28 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
   @override
   void didUpdateWidget(MapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
-    if (widget.isVisible && !oldWidget.isVisible) {
-      _loadAllRestaurants();
-    }
-    
-    if ((widget.chosenCity != oldWidget.chosenCity || 
-        widget.isVisible != oldWidget.isVisible) &&
+
+    // Only reload if the city changes, not just visibility
+    if (widget.chosenCity != oldWidget.chosenCity &&
         widget.chosenCity != 'Choose your city') {
-      // Use a slight delay to ensure the map is properly initialized
       Future.delayed(Duration.zero, () {
         if (mounted) {
           _centerOnChosenCity();
         }
       });
     }
-    
+
+    // Remove or comment out this block to avoid unnecessary reloads:
+    // if (widget.isVisible && !oldWidget.isVisible) {
+    //   _loadAllRestaurants();
+    // }
+
     if (widget.isVisible && !oldWidget.isVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           if (widget.chosenCity != 'Choose your city') {
             _centerOnChosenCity();
           } else {
-            // If no city is chosen, ensure the map reflects the current state
             _mapController.move(
                 _mapController.camera.center, _mapController.camera.zoom);
           }
@@ -106,7 +105,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       setState(() {
         _allRestaurantsLoaded = false;
       });
-      
+
       try {
         // Step 1: Get cities data first
         final citiesAsync = ref.read(citiesNotifierProvider);
@@ -118,20 +117,22 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
           ),
           error: (error, _) => throw Exception('Failed to load cities: $error'),
         );
-        
+
         // Step 2: Get restaurants data
-        final restaurantsNotifier = ref.read(restaurantsNotifierProvider.notifier);
-        final allRestaurantsData = await restaurantsNotifier.fetchRestaurants(forceRefresh: false);
-        
+        final restaurantsNotifier =
+            ref.read(restaurantsNotifierProvider.notifier);
+        final allRestaurantsData =
+            await restaurantsNotifier.fetchRestaurants(forceRefresh: false);
+
         if (!mounted) return;
-        
+
         // Create a normalized map of city names for easier matching
         final Map<String, String> normalizedCityNames = {};
         for (var city in cities) {
           final name = city['name'] as String?;
           if (name != null) {
             normalizedCityNames[name.toLowerCase()] = name;
-            
+
             // Add shortened versions for better matching
             // e.g. "New York City" -> also match "New York"
             if (name.contains(' ')) {
@@ -142,19 +143,19 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
             }
           }
         }
-        
+
         print("Cities available: ${normalizedCityNames.values.toList()}");
-        
+
         // Group restaurants by city with improved matching
         final Map<String, List<Map<String, dynamic>>> restaurantsByCity = {};
         final Map<String, int> countByCity = {};
-        
+
         for (var restaurant in allRestaurantsData) {
           final address = restaurant['address']?.toString().toLowerCase() ?? '';
-          
+
           // Try to match city by checking if the address contains any known city name
           String? matchedCity;
-          
+
           // First try exact matches from the cities database
           for (final cityKey in normalizedCityNames.keys) {
             if (address.contains(cityKey)) {
@@ -162,44 +163,44 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
               break;
             }
           }
-          
+
           // If no match, try extracting from the address format
           if (matchedCity == null) {
             final extractedCity = _extractCityFromAddress(address);
-            
+
             // Check if extracted city might match any normalized city
             for (final cityKey in normalizedCityNames.keys) {
-              if (cityKey.contains(extractedCity.toLowerCase()) || 
+              if (cityKey.contains(extractedCity.toLowerCase()) ||
                   extractedCity.toLowerCase().contains(cityKey)) {
                 matchedCity = normalizedCityNames[cityKey];
                 break;
               }
             }
           }
-          
+
           // Store the restaurant with its matched city
           if (matchedCity != null) {
             // Initialize list for this city if needed
             if (!restaurantsByCity.containsKey(matchedCity)) {
               restaurantsByCity[matchedCity] = [];
             }
-            
+
             // Add restaurant to this city's list
             restaurantsByCity[matchedCity]!.add(restaurant);
-            
+
             // Update count
             countByCity[matchedCity] = (countByCity[matchedCity] ?? 0) + 1;
           } else {
             print("WARNING: No city matched for address: $address");
           }
         }
-        
+
         // Print the results for debugging
         print("Restaurants found by city:");
         countByCity.forEach((city, count) {
           print("$city: $count restaurants");
         });
-        
+
         if (mounted) {
           setState(() {
             _allRestaurants = allRestaurantsData;
@@ -211,9 +212,8 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         print("Error loading all restaurants: $error");
         if (mounted) {
           setState(() {
-            _allRestaurantsLoaded = true; // Set to true to stop loading indicator
+            _allRestaurantsLoaded = true; // Always set to true on error
           });
-          
           // Show an error snackbar
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -225,12 +225,12 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       }
     }
   }
-  
+
   // Enhanced helper function to extract city from address
   String _extractCityFromAddress(String address) {
     // Split the address by commas
     final parts = address.split(',');
-    
+
     // Try different strategies for extraction
     if (parts.length >= 2) {
       // Typically, city is the second part in "Street, City, Country" format
@@ -243,15 +243,15 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       }
       return words.last; // Last word might be city name
     }
-    
+
     return parts.isNotEmpty ? parts[0].trim() : '';
   }
 
   void _centerOnChosenCity() async {
     if (widget.chosenCity == 'Choose your city') return;
-    
+
     print("Centering on city: ${widget.chosenCity}");
-    
+
     final citiesAsync = ref.read(citiesNotifierProvider);
 
     citiesAsync.whenData((cities) {
@@ -265,9 +265,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
           chosenCityData['longitude'] != null) {
         final lat = double.parse(chosenCityData['latitude'].toString());
         final lng = double.parse(chosenCityData['longitude'].toString());
-        
+
         print("Moving map to coordinates: $lat, $lng");
-        
+
         _mapController.move(LatLng(lat, lng), _currentZoom);
       } else {
         final restaurantsAsync = ref.read(restaurantsNotifierProvider);
@@ -284,9 +284,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
             final lat = double.parse(cityRestaurants[0]['latitude'].toString());
             final lng =
                 double.parse(cityRestaurants[0]['longitude'].toString());
-                
+
             print("Moving map to restaurant coordinates: $lat, $lng");
-            
+
             _mapController.move(LatLng(lat, lng), _currentZoom);
           }
         });
@@ -312,10 +312,15 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
     });
   }
 
+  // Add this helper function inside _MapWidgetState
+  String _normalizeCityName(String city) {
+    return city.toLowerCase().replaceAll('ü', 'u');
+  }
+
   // Simplified method to create city markers with restaurant counts
   List<Marker> _createCityMarkers(List<Map<String, dynamic>> cities) {
     final List<Marker> cityMarkers = [];
-    
+
     // Debug: Print cities data
     print("Creating markers for ${cities.length} cities");
     print("Restaurant counts available: ${_restaurantCountByCity.length}");
@@ -328,7 +333,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
       // Get the count of restaurants for this city
       final count = _restaurantCountByCity[cityName] ?? 0;
-      
+
       // Only show cities that have restaurants
       if (count <= 0) {
         print("Skipping city $cityName - no restaurants found for this city");
@@ -338,12 +343,12 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       // Get city coordinates
       final cityLatStr = city['latitude']?.toString() ?? '';
       final cityLngStr = city['longitude']?.toString() ?? '';
-      
+
       if (cityLatStr.isEmpty || cityLngStr.isEmpty) {
         print("Skipping city $cityName - missing coordinates");
         continue;
       }
-      
+
       final cityLat = double.tryParse(cityLatStr) ?? 0;
       final cityLng = double.tryParse(cityLngStr) ?? 0;
 
@@ -352,8 +357,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         print("Skipping city $cityName - zero coordinates");
         continue;
       }
-      
-      print("Adding marker for $cityName with $count restaurants at $cityLat,$cityLng");
+
+      print(
+          "Adding marker for $cityName with $count restaurants at $cityLat,$cityLng");
 
       // Create a marker for this city with restaurant count
       cityMarkers.add(
@@ -366,10 +372,10 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
               // Zoom in when a city cluster is tapped - set zoom to just above threshold
               _mapController.move(
                   LatLng(cityLat, cityLng), _cityClusterZoomThreshold + 0.5);
-                  
+
               // Update chosen city through the provider
               ref.read(chosenCityProvider.notifier).updateCity(cityName);
-              
+
               // Show a snackbar with count info
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -406,7 +412,8 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.8),
                     borderRadius: BorderRadius.circular(4),
@@ -426,9 +433,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         ),
       );
     }
-    
+
     print("Created ${cityMarkers.length} city markers");
-    
+
     return cityMarkers;
   }
 
@@ -442,16 +449,46 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
     return restaurantsAsync.when(
       data: (restaurants) {
-        // Filter restaurants by chosen city if specified
-        final filteredRestaurants = widget.chosenCity == 'Choose your city'
-            ? restaurants
-            : restaurants
-                .where((restaurant) =>
-                    restaurant['address'] != null &&
-                    restaurant['address']
-                        .toString()
-                        .contains(widget.chosenCity))
-                .toList();
+        // Always use all available restaurants for map markers if widget.restaurants is non-null and non-empty
+        final sourceRestaurants =
+            (widget.restaurants != null && widget.restaurants!.isNotEmpty)
+                ? widget.restaurants!
+                : restaurants;
+        List<Map<String, dynamic>> filteredRestaurants;
+        print(
+            "MapWidget: Using ${sourceRestaurants.length} restaurants for filtering");
+        if (widget.chosenCity == 'Choose your city') {
+          // Show all if no city chosen (relevant for map view)
+          filteredRestaurants = sourceRestaurants;
+        } else {
+          // When zoomed in, show all restaurants in the chosen city
+          if (_currentZoom >= _cityClusterZoomThreshold) {
+            final chosenNormalized = _normalizeCityName(widget.chosenCity);
+            filteredRestaurants = sourceRestaurants.where((restaurant) {
+              final address =
+                  _normalizeCityName((restaurant['address'] ?? '').toString());
+              final cityField =
+                  _normalizeCityName((restaurant['city'] ?? '').toString());
+
+              // Always use normalized comparison for all cities
+              return address.contains(chosenNormalized) ||
+                  cityField.contains(chosenNormalized);
+            }).toList();
+          } else {
+            // When zoomed out, don't show any restaurants (only clusters)
+            filteredRestaurants = [];
+          }
+        }
+
+        print(
+            "MapWidget Build: Zoom= ${_currentZoom.toStringAsFixed(2)}, Threshold= $_cityClusterZoomThreshold, Filtered Restaurants= ${filteredRestaurants.length}, ChosenCity= ${widget.chosenCity}");
+        if (_currentZoom >= _cityClusterZoomThreshold) {
+          print(
+              "MapWidget: Should be showing individual restaurants now (zoom: $_currentZoom)");
+        } else {
+          print(
+              "MapWidget: Should be showing city clusters now (zoom: $_currentZoom)");
+        }
 
         return citiesAsync.when(
           data: (cities) {
@@ -468,13 +505,34 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                           onMapEvent: (event) {
                             // Update current zoom level when map changes
                             if (event.source == MapEventSource.mapController ||
-                                event.source == MapEventSource.flingAnimationController ||
-                                event.source == MapEventSource.doubleTapZoomAnimationController) {
-                              setState(() {
-                                _currentZoom = event.camera.zoom;
-                              });
+                                event.source ==
+                                    MapEventSource.flingAnimationController ||
+                                event.source ==
+                                    MapEventSource
+                                        .doubleTapZoomAnimationController ||
+                                event.source == MapEventSource.onDrag ||
+                                event.source == MapEventSource.onMultiFinger ||
+                                event.source == MapEventSource.mapController ||
+                                event.source == MapEventSource.scrollWheel) {
+                              final newZoom = event.camera.zoom;
+                              final wasShowingClusters =
+                                  _currentZoom < _cityClusterZoomThreshold;
+                              final willShowClusters =
+                                  newZoom < _cityClusterZoomThreshold;
+
+                              // Only rebuild if crossing the threshold or significant zoom change
+                              if (wasShowingClusters != willShowClusters ||
+                                  (_currentZoom - newZoom).abs() > 0.1) {
+                                setState(() {
+                                  _currentZoom = newZoom;
+                                });
+                              }
                             }
                           },
+                          minZoom:
+                              5.0, // Minimum zoom to prevent zooming out too far
+                          maxZoom:
+                              18.0, // Maximum zoom to prevent zooming in too much
                         ),
                         children: [
                           TileLayer(
@@ -504,59 +562,129 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                                 ),
                               ],
                             ),
-                          MarkerLayer(
-                            key: ValueKey("markers-${_currentZoom < _cityClusterZoomThreshold}"),
-                            markers: _currentZoom < _cityClusterZoomThreshold
-                                ? _createCityMarkers(cities)  // Show city clusters when zoomed out
-                                : filteredRestaurants.map((restaurant) {
-                                    final double lat = restaurant['latitude'] != null
-                                        ? double.parse(restaurant['latitude'].toString())
-                                        : zurichLat;
 
-                                    final double lng = restaurant['longitude'] != null
-                                        ? double.parse(restaurant['longitude'].toString())
-                                        : zurichLng;
+                          // City cluster layer (displayed when zoomed out)
+                          if (_currentZoom < _cityClusterZoomThreshold)
+                            MarkerLayer(
+                              key: const ValueKey("city-clusters"),
+                              markers: _createCityMarkers(cities),
+                            ),
 
-                                    final String name = restaurant['name'] ?? 'Unnamed Restaurant';
-                                    final String address = restaurant['address'] ?? 'No address';
+                          // Individual restaurants layer (displayed when zoomed in)
+                          if (_currentZoom >= _cityClusterZoomThreshold &&
+                              filteredRestaurants.isNotEmpty)
+                            MarkerLayer(
+                              key: const ValueKey("individual-restaurants"),
+                              markers: filteredRestaurants.map((restaurant) {
+                                // Log some restaurants for debugging
+                                if (filteredRestaurants.indexOf(restaurant) <
+                                    3) {
+                                  print(
+                                      "Creating marker for restaurant: ${restaurant['name']}");
+                                }
 
-                                    return Marker(
-                                      width: 120.0,
-                                      height: 60.0,
-                                      point: LatLng(lat, lng),
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          if (widget.onMarkerTapped != null) {
-                                            widget.onMarkerTapped!(name);
-                                          }
+                                // Parse coordinates more safely
+                                double? lat, lng;
+                                try {
+                                  lat = double.tryParse(
+                                          restaurant['latitude']?.toString() ??
+                                              '') ??
+                                      zurichLat;
+                                  lng = double.tryParse(
+                                          restaurant['longitude']?.toString() ??
+                                              '') ??
+                                      zurichLng;
+                                } catch (e) {
+                                  print("Error parsing coordinates: $e");
+                                  lat = zurichLat;
+                                  lng = zurichLng;
+                                }
 
-                                          showDialog(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: Text(name),
-                                              content: Text(address),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.of(context).pop(),
-                                                  child: const Text('Close'),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                        child: const Column(
-                                          children: [
-                                            Icon(
-                                              Icons.fastfood,
-                                              color: Colors.red,
-                                              size: 30,
+                                final String name =
+                                    restaurant['name'] ?? 'Unnamed Restaurant';
+                                final String address =
+                                    restaurant['address'] ?? 'No address';
+
+                                return Marker(
+                                  width: 120.0,
+                                  height: 80.0, // Taller for better visibility
+                                  point: LatLng(lat, lng),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      if (widget.onMarkerTapped != null) {
+                                        widget.onMarkerTapped!(name);
+                                      }
+
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: Text(name),
+                                          content: Text(address),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.of(context).pop(),
+                                              child: const Text('Close'),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                    );
-                                  }).toList(),
-                          ),
+                                      );
+                                    },
+                                    child: Column(
+                                      children: [
+                                        // Make marker more visible with a background
+                                        Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withOpacity(0.2),
+                                                blurRadius: 4,
+                                                spreadRadius: 2,
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.fastfood,
+                                            color: Colors.red,
+                                            size: 30,
+                                          ),
+                                        ),
+                                        // Show a bit of the name for identification
+                                        if (name.isNotEmpty)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 4, vertical: 2),
+                                            margin:
+                                                const EdgeInsets.only(top: 2),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  Colors.white.withOpacity(0.8),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              name.length > 12
+                                                  ? '${name.substring(0, 10)}...'
+                                                  : name,
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+
                           const RichAttributionWidget(
                             alignment: AttributionAlignment.bottomLeft,
                             animationConfig: ScaleRAWA(),
@@ -571,16 +699,17 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                           ),
                         ],
                       ),
-                      
+
                       // Loading indicator while getting all restaurants
-                      if (!_allRestaurantsLoaded)
+                      if (!_allRestaurantsLoaded && widget.chosenCity == 'Choose your city')
                         Positioned(
                           top: 60,
                           left: 0,
                           right: 0,
                           child: Center(
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.8),
                                 borderRadius: BorderRadius.circular(20),
@@ -613,7 +742,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                             ),
                           ),
                         ),
-                      
+
                       Positioned(
                         right: 16,
                         bottom: 20,
@@ -625,23 +754,25 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                           elevation: 0,
                           onPressed: () async {
                             try {
-                              final position = await Geolocator.getCurrentPosition(
+                              final position =
+                                  await Geolocator.getCurrentPosition(
                                 locationSettings: const LocationSettings(
                                   accuracy: LocationAccuracy.high,
                                 ),
                               );
-                              final userLatLng = LatLng(position.latitude, position.longitude);
-                              
+                              final userLatLng =
+                                  LatLng(position.latitude, position.longitude);
+
                               // Update the user location marker
                               setState(() {
                                 _userLocation = userLatLng;
                                 _showUserLocation = true;
                                 _currentZoom = 15.0;
                               });
-                              
+
                               // Move map to user location
                               _mapController.move(userLatLng, 15.0);
-                              
+
                               // Find nearest city and update the provider
                               await _findNearestCityAndUpdate(userLatLng);
                             } catch (e) {
@@ -657,16 +788,18 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                           },
                           child: Transform.rotate(
                             angle: 45 * 3.14159 / 180,
-                            child: const Icon(Icons.navigation, color: Colors.white),
+                            child: const Icon(Icons.navigation,
+                                color: Colors.white),
                           ),
                         ),
                       ),
-                      
+
                       Positioned(
                         top: 16,
                         left: 16,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(16),
@@ -681,7 +814,8 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.restaurant, size: 16, color: Colors.blue),
+                              const Icon(Icons.restaurant,
+                                  size: 16, color: Colors.blue),
                               const SizedBox(width: 4),
                               Text(
                                 "Total: ${_restaurantCountByCity.values.fold(0, (sum, count) => sum + count)} restaurants",
@@ -695,7 +829,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                           ),
                         ),
                       ),
-                      
+
                       // Zoom level indicator
                       Positioned(
                         top: 16,
@@ -713,34 +847,29 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                         ),
                       ),
 
-                      // Add zoom feedback indicator when near threshold
-                      if (_currentZoom >= _cityClusterZoomThreshold - 1 && 
-                          _currentZoom <= _cityClusterZoomThreshold + 1)
-                        Positioned(
-                          bottom: 100,
-                          left: 0,
-                          right: 0,
-                          child: Center(
-                            child: AnimatedOpacity(
-                              opacity: (_currentZoom < _cityClusterZoomThreshold) ? 1.0 : 0.0,
-                              duration: const Duration(milliseconds: 300),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.7),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Text(
-                                  "Zoom in to see individual restaurants",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
+                      // Add debug overlay to show current view mode
+                      Positioned(
+                        top: 60,
+                        right: 16,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _currentZoom < _cityClusterZoomThreshold
+                                ? "Cities View"
+                                : "Restaurants View",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),
@@ -757,7 +886,8 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                           setState(() {
                             _currentZoom = 8.0; // Zoom level for overview
                           });
-                          _mapController.move(const LatLng(zurichLat, zurichLng), 8.0);
+                          _mapController.move(
+                              const LatLng(zurichLat, zurichLng), 8.0);
                           _loadAllRestaurants(); // Refresh data
                         },
                         icon: const Icon(Icons.public),
@@ -846,7 +976,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         // Parse city coordinates
         final cityLat = double.tryParse(city['latitude'].toString());
         final cityLng = double.tryParse(city['longitude'].toString());
-        
+
         if (cityLat == null || cityLng == null) continue;
 
         // Calculate distance using the Distance class
@@ -866,18 +996,19 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
       if (nearestCity != null) {
         final cityName = nearestCity['name'] as String;
-        
+
         // Update the chosen city using the provider
         ref.read(chosenCityProvider.notifier).updateCity(cityName);
-        
+
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Nearest city found: $cityName (${nearestDistance.toStringAsFixed(1)} km away)'),
+            content: Text(
+                'Nearest city found: $cityName (${nearestDistance.toStringAsFixed(1)} km away)'),
             duration: const Duration(seconds: 3),
           ),
         );
-        
+
         // Center map on the city (use a slight delay to ensure provider updates first)
         Future.delayed(const Duration(milliseconds: 300), () {
           if (mounted) {

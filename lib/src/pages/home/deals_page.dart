@@ -36,8 +36,32 @@ class _DealsPageState extends ConsumerState<DealsPage> {
   @override
   void initState() {
     super.initState();
-    _loadSavedFilters();
+    _loadSavedFilters().then((_) {
+      // After loading filters, check if a city is already selected and fetch
+      final chosenCity = ref.read(chosenCityProvider);
+      if (chosenCity != 'Choose your city') {
+        // Decide whether to fetch filtered or all based on whether filters were loaded
+        if (_selectedCategories.isNotEmpty &&
+            !_selectedCategories.contains("All")) {
+          _fetchFilteredRestaurants();
+        } else {
+          _fetchAllRestaurantsForCity(); // Fetch all initially if no specific filters
+        }
+      }
+    });
     _getCurrentPosition(); // Get user position when page initializes
+
+    // Listen for changes in the chosen city
+    ref.listenManual(chosenCityProvider, (previousCity, newCity) {
+      if (newCity != 'Choose your city' && newCity != previousCity) {
+        print("City changed to $newCity, fetching all restaurants for map...");
+        // Fetch all restaurants for the map view first
+        _fetchAllRestaurantsForCity().then((_) {
+          // Optionally, re-apply filters for the list view if needed
+          // _fetchFilteredRestaurants(); // Uncomment if list should also update based on filters
+        });
+      }
+    });
   }
 
   @override
@@ -47,14 +71,11 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     super.dispose();
   }
 
+  // Remove didChangeDependencies or simplify it as initState now handles initial load
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // If city is already loaded, fetch restaurants
-    final chosenCity = ref.read(chosenCityProvider);
-    if (chosenCity != 'Choose your city') {
-      _fetchFilteredRestaurants();
-    }
+    // Initial logic moved to initState to coordinate with filter loading
   }
 
   // Get user's current position
@@ -113,6 +134,60 @@ class _DealsPageState extends ConsumerState<DealsPage> {
         ..sort((a, b) => (a['distance'] ?? double.infinity)
             .compareTo(b['distance'] ?? double.infinity));
     });
+  }
+
+  // Add this helper to fetch all restaurants for a city (no filters)
+  Future<void> _fetchAllRestaurantsForCity() async {
+    final chosenCity = ref.read(chosenCityProvider);
+    if (chosenCity == 'Choose your city' || !mounted || _isDisposed) return;
+
+    // Avoid showing loading indicator if already loading filtered results
+    if (!_isLoadingRestaurants) {
+      setState(() {
+        _isLoadingRestaurants = true;
+      });
+    }
+
+    try {
+      final restaurantsNotifier =
+          ref.read(restaurantsNotifierProvider.notifier);
+      // Use fetchRestaurants directly to get *all* restaurants first
+      final allRestaurants = await restaurantsNotifier.fetchRestaurants();
+
+      if (!mounted || _isDisposed) return;
+
+      // Filter by city locally
+      final cityRestaurants = allRestaurants.where((restaurant) {
+        final address = (restaurant['address'] ?? '').toString().toLowerCase();
+        final cityField = (restaurant['city'] ?? '').toString().toLowerCase();
+        final chosen = chosenCity.toLowerCase();
+        return address.contains(chosen) || cityField.contains(chosen);
+      }).toList();
+
+      // Update state with restaurants for the map
+      // Only update if not disposed
+      if (mounted && !_isDisposed) {
+        setState(() {
+          // Update _filteredRestaurants which is used by MapWidget
+          _filteredRestaurants = cityRestaurants;
+          _isLoadingRestaurants = false;
+        });
+        // Update distances after fetching
+        _updateRestaurantsWithDistance();
+      }
+    } catch (error) {
+      print("Error fetching all restaurants for city: $error");
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _isLoadingRestaurants = false;
+          // Optionally clear restaurants on error or show message
+          _filteredRestaurants = [];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading restaurants for map: $error')),
+        );
+      }
+    }
   }
 
   void _showCitiesList(List<String> cities) {
@@ -184,6 +259,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                       ),
                       onTap: () {
                         // Use the chosenCityProvider to update city
+                        // The listener in initState will trigger the fetch
                         ref
                             .read(chosenCityProvider.notifier)
                             .updateCity(cities[index]);
@@ -191,8 +267,6 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                           _iconTapped = false;
                         });
                         Navigator.pop(context);
-                        // Fetch restaurants after choosing city
-                        _fetchFilteredRestaurants();
                       },
                     );
                   },
@@ -429,19 +503,17 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     await prefs.setStringList(_filtersPreferenceKey, filters);
   }
 
-  // Load filters from SharedPreferences
+  // Load filters from SharedPreferences - make it return Future<void>
   Future<void> _loadSavedFilters() async {
     final prefs = await SharedPreferences.getInstance();
     final savedFilters = prefs.getStringList(_filtersPreferenceKey);
     if (savedFilters != null && savedFilters.isNotEmpty) {
-      setState(() {
-        _selectedCategories = savedFilters;
-      });
-      // Fetch restaurants with saved filters if city is already selected
-      final chosenCity = ref.read(chosenCityProvider);
-      if (chosenCity != 'Choose your city') {
-        _fetchFilteredRestaurants();
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _selectedCategories = savedFilters;
+        });
       }
+      // REMOVED: Fetching logic moved to initState after this completes
     }
   }
 
@@ -641,7 +713,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       if (!mounted || _isDisposed) return;
 
       setState(() {
-        _isLoadingRestaurants = true;
+        _isLoadingRestaurants = true; // Show loading indicator
       });
 
       // Use location provider to get user's position
@@ -658,13 +730,20 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       });
 
       // Find the nearest city based on user's location
+      // This will update chosenCityProvider, triggering the listener
       await _findNearestCity(position);
+
+      // REMOVED: await _fetchAllRestaurantsForCity(); // Listener handles this
+
+      // Hide loading indicator (listener will manage its own loading state if needed)
+      // setState(() {
+      //   _isLoadingRestaurants = false;
+      // });
     } catch (error) {
       if (mounted && !_isDisposed) {
         setState(() {
           _isLoadingRestaurants = false;
         });
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error locating you: $error')),
         );
@@ -1005,21 +1084,17 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
                         // Map/List Toggle Button
                         GestureDetector(
-                          onTap: () {
+                          onTap: () async {
                             setState(() {
                               _isMapView = !_isMapView;
-
-                              // If switching to map view, give the map time to render
-                              // then trigger a refresh
-                              if (_isMapView) {
-                                Future.delayed(
-                                    const Duration(milliseconds: 100), () {
-                                  setState(() {
-                                    // This empty setState forces a rebuild after the map is visible
-                                  });
-                                });
-                              }
                             });
+                            // If switching to map view and no restaurants loaded, fetch all for city
+                            if (_isMapView &&
+                                _filteredRestaurants.isEmpty &&
+                                chosenCity != 'Choose your city') {
+                              await _fetchAllRestaurantsForCity();
+                              setState(() {}); // Force rebuild after fetching
+                            }
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
