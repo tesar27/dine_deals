@@ -141,7 +141,6 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     final chosenCity = ref.read(chosenCityProvider);
     if (chosenCity == 'Choose your city' || !mounted || _isDisposed) return;
 
-    // Avoid showing loading indicator if already loading filtered results
     if (!_isLoadingRestaurants) {
       setState(() {
         _isLoadingRestaurants = true;
@@ -151,28 +150,26 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     try {
       final restaurantsNotifier =
           ref.read(restaurantsNotifierProvider.notifier);
-      // Use fetchRestaurants directly to get *all* restaurants first
       final allRestaurants = await restaurantsNotifier.fetchRestaurants();
 
       if (!mounted || _isDisposed) return;
 
-      // Filter by city locally
+      // Normalize city name for comparison
+      String normalize(String s) => s.toLowerCase().replaceAll('ü', 'u').trim();
+      final chosen = normalize(chosenCity);
+
       final cityRestaurants = allRestaurants.where((restaurant) {
-        final address = (restaurant['address'] ?? '').toString().toLowerCase();
-        final cityField = (restaurant['city'] ?? '').toString().toLowerCase();
-        final chosen = chosenCity.toLowerCase();
+        final address = normalize((restaurant['address'] ?? '').toString());
+        final cityField = normalize((restaurant['city'] ?? '').toString());
+        // Match if either field contains the normalized chosen city
         return address.contains(chosen) || cityField.contains(chosen);
       }).toList();
 
-      // Update state with restaurants for the map
-      // Only update if not disposed
       if (mounted && !_isDisposed) {
         setState(() {
-          // Update _filteredRestaurants which is used by MapWidget
           _filteredRestaurants = cityRestaurants;
           _isLoadingRestaurants = false;
         });
-        // Update distances after fetching
         _updateRestaurantsWithDistance();
       }
     } catch (error) {

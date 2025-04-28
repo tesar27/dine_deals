@@ -1,35 +1,10 @@
+import 'package:dine_deals/src/pages/details/edit_place_details.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dine_deals/src/providers/deals_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-final userNotifierProvider =
-    StateNotifierProvider<UserNotifier, AsyncValue<Map<String, dynamic>?>>(
-        (ref) {
-  return UserNotifier();
-});
-
-class UserNotifier extends StateNotifier<AsyncValue<Map<String, dynamic>?>> {
-  UserNotifier() : super(const AsyncValue.loading()) {
-    _fetchUser();
-  }
-
-  Future<void> _fetchUser() async {
-    try {
-      await Future.delayed(const Duration(seconds: 1));
-      final userData = {
-        'email': 'user@example.com',
-        'avatar_url': 'https://example.com/avatar.jpg',
-        'is_super_admin': 'true',
-        'name': 'John Doe',
-      };
-      state = AsyncValue.data(userData);
-    } catch (e) {
-      state = AsyncValue.error(e, StackTrace.current);
-    }
-  }
-}
+import 'package:dine_deals/src/providers/user_provider.dart';
 
 class PlaceDetails extends ConsumerStatefulWidget {
   final Map<String, dynamic> restaurant;
@@ -44,6 +19,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _deals = [];
   bool _isFavorite = false;
+  bool _isSuperAdmin = false;
 
   final _supabase = Supabase.instance.client;
 
@@ -314,11 +290,46 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
 
   @override
   Widget build(BuildContext context) {
+    // Access user data from userNotifierProvider
+    final userState = ref.watch(userNotifierProvider);
+
+    // Check super admin status whenever user data changes
+    userState.whenData((userData) {
+      if (userData != null) {
+        final isSuperAdmin = userData['is_super_admin']?.toString() ?? 'false';
+        setState(() {
+          _isSuperAdmin = isSuperAdmin.toLowerCase() == 'true';
+        });
+      }
+    });
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          if (_isSuperAdmin)
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.7),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.black),
+                  onPressed: () => Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          EditPlaceDetails(restaurant: widget.restaurant),
+                    ),
+                  ),
+                  tooltip: 'Edit Place Details',
+                ),
+              ),
+            ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshPlaceDetails,
@@ -597,5 +608,15 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
         duration: Duration(seconds: 1),
       ),
     );
+  }
+
+  void editPlaceDetails() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Edit functionality will be implemented here'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    // TODO: Navigate to edit page or show edit dialog
   }
 }

@@ -41,13 +41,19 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
   List<Map<String, dynamic>> _allRestaurants = [];
   Map<String, int> _restaurantCountByCity = {};
 
+  // Add a flag to track if we're currently filtering restaurants
+  bool _isFiltering = false;
+
+  // Add a state variable to track all loaded restaurants (unfiltered)
+  List<Map<String, dynamic>> _allLoadedRestaurants = [];
+
   @override
   void initState() {
     super.initState();
     if (widget.isVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _loadAllRestaurants();
+          _loadAllRestaurants(forceRefresh: false);
           if (widget.chosenCity != 'Choose your city') {
             _centerOnChosenCity();
 
@@ -80,11 +86,6 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       });
     }
 
-    // Remove or comment out this block to avoid unnecessary reloads:
-    // if (widget.isVisible && !oldWidget.isVisible) {
-    //   _loadAllRestaurants();
-    // }
-
     if (widget.isVisible && !oldWidget.isVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -99,11 +100,12 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
     }
   }
 
-  // Load all restaurants and count by city - fixed to correctly match cities
-  Future<void> _loadAllRestaurants() async {
+  // Modified to use forceRefresh parameter and handle errors better
+  Future<void> _loadAllRestaurants({bool forceRefresh = false}) async {
     if (mounted) {
       setState(() {
         _allRestaurantsLoaded = false;
+        _isFiltering = true;
       });
 
       try {
@@ -111,20 +113,25 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         final citiesAsync = ref.read(citiesNotifierProvider);
         final cities = await citiesAsync.when(
           data: (data) => Future.value(data),
-          loading: () => Future<List<Map<String, dynamic>>>.delayed(
+          loading: () => Future.delayed(
             const Duration(seconds: 1),
             () => throw Exception('Cities still loading'),
           ),
           error: (error, _) => throw Exception('Failed to load cities: $error'),
         );
 
-        // Step 2: Get restaurants data
+        // Step 2: Get restaurants data - use the passed forceRefresh parameter
         final restaurantsNotifier =
             ref.read(restaurantsNotifierProvider.notifier);
-        final allRestaurantsData =
-            await restaurantsNotifier.fetchRestaurants(forceRefresh: false);
+        final allRestaurantsData = await restaurantsNotifier.fetchRestaurants(
+            forceRefresh: forceRefresh);
 
         if (!mounted) return;
+
+        // Store the complete restaurant list in state
+        setState(() {
+          _allLoadedRestaurants = allRestaurantsData;
+        });
 
         // Create a normalized map of city names for easier matching
         final Map<String, String> normalizedCityNames = {};
@@ -206,21 +213,32 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
             _allRestaurants = allRestaurantsData;
             _restaurantCountByCity = countByCity;
             _allRestaurantsLoaded = true;
+            _isFiltering = false;
           });
         }
       } catch (error) {
         print("Error loading all restaurants: $error");
         if (mounted) {
           setState(() {
-            _allRestaurantsLoaded = true; // Always set to true on error
+            _allRestaurantsLoaded =
+                true; // Set to true on error to stop loading indicator
+            _isFiltering = false;
           });
-          // Show an error snackbar
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error loading restaurants: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
+
+          // Don't show error if we provided restaurants directly
+          if (widget.restaurants == null || widget.restaurants!.isEmpty) {
+            // Show an error snackbar
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error loading restaurants: $error'),
+                backgroundColor: Colors.red,
+                action: SnackBarAction(
+                  label: 'Retry',
+                  onPressed: () => _loadAllRestaurants(forceRefresh: true),
+                ),
+              ),
+            );
+          }
         }
       }
     }
@@ -441,503 +459,533 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final restaurantsAsync = widget.restaurants != null
-        ? AsyncData<List<Map<String, dynamic>>>(widget.restaurants!)
-        : ref.watch(restaurantsNotifierProvider);
+    // Use widget.restaurants if provided, otherwise use the restaurantsProvider
+    // but with local state management to prevent infinite loading
+    final List<Map<String, dynamic>> sourceRestaurants;
 
+    if (widget.restaurants != null && widget.restaurants!.isNotEmpty) {
+      // Use provided restaurants directly
+      sourceRestaurants = widget.restaurants!;
+    } else if (_allLoadedRestaurants.isNotEmpty) {
+      // Use locally cached restaurants to prevent reloading
+      sourceRestaurants = _allLoadedRestaurants;
+    } else {
+      // Fall back to provider (only on initial load)
+      final restaurantsAsync = ref.watch(restaurantsNotifierProvider);
+
+      return restaurantsAsync.when(
+        data: (restaurants) {
+          // Store the loaded restaurants to prevent future reloads
+          if (mounted && _allLoadedRestaurants.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              setState(() {
+                _allLoadedRestaurants = restaurants;
+              });
+              // Process cities after getting restaurants
+              _loadAllRestaurants(forceRefresh: false);
+            });
+          }
+          return _buildMapContent(restaurants);
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Error loading restaurants: $error'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  ref.refresh(restaurantsNotifierProvider);
+                  _loadAllRestaurants(forceRefresh: true);
+                },
+                child: const Text('Try Again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Use the citiesProvider for city clusters
     final citiesAsync = ref.watch(citiesNotifierProvider);
 
-    return restaurantsAsync.when(
-      data: (restaurants) {
-        // Always use all available restaurants for map markers if widget.restaurants is non-null and non-empty
-        final sourceRestaurants =
-            (widget.restaurants != null && widget.restaurants!.isNotEmpty)
-                ? widget.restaurants!
-                : restaurants;
-        List<Map<String, dynamic>> filteredRestaurants;
-        print(
-            "MapWidget: Using ${sourceRestaurants.length} restaurants for filtering");
-        if (widget.chosenCity == 'Choose your city') {
-          // Show all if no city chosen (relevant for map view)
-          filteredRestaurants = sourceRestaurants;
-        } else {
-          // When zoomed in, show all restaurants in the chosen city
-          if (_currentZoom >= _cityClusterZoomThreshold) {
-            final chosenNormalized = _normalizeCityName(widget.chosenCity);
-            filteredRestaurants = sourceRestaurants.where((restaurant) {
-              final address =
-                  _normalizeCityName((restaurant['address'] ?? '').toString());
-              final cityField =
-                  _normalizeCityName((restaurant['city'] ?? '').toString());
-
-              // Always use normalized comparison for all cities
-              return address.contains(chosenNormalized) ||
-                  cityField.contains(chosenNormalized);
-            }).toList();
-          } else {
-            // When zoomed out, don't show any restaurants (only clusters)
-            filteredRestaurants = [];
-          }
-        }
-
-        print(
-            "MapWidget Build: Zoom= ${_currentZoom.toStringAsFixed(2)}, Threshold= $_cityClusterZoomThreshold, Filtered Restaurants= ${filteredRestaurants.length}, ChosenCity= ${widget.chosenCity}");
-        if (_currentZoom >= _cityClusterZoomThreshold) {
-          print(
-              "MapWidget: Should be showing individual restaurants now (zoom: $_currentZoom)");
-        } else {
-          print(
-              "MapWidget: Should be showing city clusters now (zoom: $_currentZoom)");
-        }
-
-        return citiesAsync.when(
-          data: (cities) {
-            return Column(
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      FlutterMap(
-                        mapController: _mapController,
-                        options: MapOptions(
-                          initialCenter: const LatLng(zurichLat, zurichLng),
-                          initialZoom: _currentZoom,
-                          onMapEvent: (event) {
-                            // Update current zoom level when map changes
-                            if (event.source == MapEventSource.mapController ||
-                                event.source ==
-                                    MapEventSource.flingAnimationController ||
-                                event.source ==
-                                    MapEventSource
-                                        .doubleTapZoomAnimationController ||
-                                event.source == MapEventSource.onDrag ||
-                                event.source == MapEventSource.onMultiFinger ||
-                                event.source == MapEventSource.mapController ||
-                                event.source == MapEventSource.scrollWheel) {
-                              final newZoom = event.camera.zoom;
-                              final wasShowingClusters =
-                                  _currentZoom < _cityClusterZoomThreshold;
-                              final willShowClusters =
-                                  newZoom < _cityClusterZoomThreshold;
-
-                              // Only rebuild if crossing the threshold or significant zoom change
-                              if (wasShowingClusters != willShowClusters ||
-                                  (_currentZoom - newZoom).abs() > 0.1) {
-                                setState(() {
-                                  _currentZoom = newZoom;
-                                });
-                              }
-                            }
-                          },
-                          minZoom:
-                              5.0, // Minimum zoom to prevent zooming out too far
-                          maxZoom:
-                              18.0, // Maximum zoom to prevent zooming in too much
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate:
-                                'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                            subdomains: const ['a', 'b', 'c', 'd'],
-                            userAgentPackageName: 'com.dinedeals.app',
-                            retinaMode:
-                                MediaQuery.of(context).devicePixelRatio > 1.0,
-                          ),
-                          if (_showUserLocation && _userLocation != null)
-                            CircleLayer(
-                              circles: [
-                                CircleMarker(
-                                  point: _userLocation!,
-                                  radius: 10,
-                                  color: Colors.blue.withOpacity(0.7),
-                                  borderColor: Colors.white,
-                                  borderStrokeWidth: 2,
-                                  useRadiusInMeter: false,
-                                ),
-                                CircleMarker(
-                                  point: _userLocation!,
-                                  radius: 30,
-                                  color: Colors.blue.withOpacity(0.2),
-                                  useRadiusInMeter: false,
-                                ),
-                              ],
-                            ),
-
-                          // City cluster layer (displayed when zoomed out)
-                          if (_currentZoom < _cityClusterZoomThreshold)
-                            MarkerLayer(
-                              key: const ValueKey("city-clusters"),
-                              markers: _createCityMarkers(cities),
-                            ),
-
-                          // Individual restaurants layer (displayed when zoomed in)
-                          if (_currentZoom >= _cityClusterZoomThreshold &&
-                              filteredRestaurants.isNotEmpty)
-                            MarkerLayer(
-                              key: const ValueKey("individual-restaurants"),
-                              markers: filteredRestaurants.map((restaurant) {
-                                // Log some restaurants for debugging
-                                if (filteredRestaurants.indexOf(restaurant) <
-                                    3) {
-                                  print(
-                                      "Creating marker for restaurant: ${restaurant['name']}");
-                                }
-
-                                // Parse coordinates more safely
-                                double? lat, lng;
-                                try {
-                                  lat = double.tryParse(
-                                          restaurant['latitude']?.toString() ??
-                                              '') ??
-                                      zurichLat;
-                                  lng = double.tryParse(
-                                          restaurant['longitude']?.toString() ??
-                                              '') ??
-                                      zurichLng;
-                                } catch (e) {
-                                  print("Error parsing coordinates: $e");
-                                  lat = zurichLat;
-                                  lng = zurichLng;
-                                }
-
-                                final String name =
-                                    restaurant['name'] ?? 'Unnamed Restaurant';
-                                final String address =
-                                    restaurant['address'] ?? 'No address';
-
-                                return Marker(
-                                  width: 120.0,
-                                  height: 80.0, // Taller for better visibility
-                                  point: LatLng(lat, lng),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      if (widget.onMarkerTapped != null) {
-                                        widget.onMarkerTapped!(name);
-                                      }
-
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: Text(name),
-                                          content: Text(address),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.of(context).pop(),
-                                              child: const Text('Close'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                    child: Column(
-                                      children: [
-                                        // Make marker more visible with a background
-                                        Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black
-                                                    .withOpacity(0.2),
-                                                blurRadius: 4,
-                                                spreadRadius: 2,
-                                              ),
-                                            ],
-                                          ),
-                                          child: const Icon(
-                                            Icons.fastfood,
-                                            color: Colors.red,
-                                            size: 30,
-                                          ),
-                                        ),
-                                        // Show a bit of the name for identification
-                                        if (name.isNotEmpty)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 4, vertical: 2),
-                                            margin:
-                                                const EdgeInsets.only(top: 2),
-                                            decoration: BoxDecoration(
-                                              color:
-                                                  Colors.white.withOpacity(0.8),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              name.length > 12
-                                                  ? '${name.substring(0, 10)}...'
-                                                  : name,
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-
-                          const RichAttributionWidget(
-                            alignment: AttributionAlignment.bottomLeft,
-                            animationConfig: ScaleRAWA(),
-                            attributions: [
-                              TextSourceAttribution(
-                                '© OpenStreetMap contributors',
-                              ),
-                              TextSourceAttribution(
-                                'CARTO',
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-
-                      // Loading indicator while getting all restaurants
-                      if (!_allRestaurantsLoaded && widget.chosenCity == 'Choose your city')
-                        Positioned(
-                          top: 60,
-                          left: 0,
-                          right: 0,
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.8),
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 4,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Theme.of(context).primaryColor,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    "Loading all restaurants...",
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-
-                      Positioned(
-                        right: 16,
-                        bottom: 20,
-                        child: FloatingActionButton(
-                          heroTag: 'locate_me',
-                          mini: true,
-                          shape: const CircleBorder(),
-                          backgroundColor: Colors.blue,
-                          elevation: 0,
-                          onPressed: () async {
-                            try {
-                              final position =
-                                  await Geolocator.getCurrentPosition(
-                                locationSettings: const LocationSettings(
-                                  accuracy: LocationAccuracy.high,
-                                ),
-                              );
-                              final userLatLng =
-                                  LatLng(position.latitude, position.longitude);
-
-                              // Update the user location marker
-                              setState(() {
-                                _userLocation = userLatLng;
-                                _showUserLocation = true;
-                                _currentZoom = 15.0;
-                              });
-
-                              // Move map to user location
-                              _mapController.move(userLatLng, 15.0);
-
-                              // Find nearest city and update the provider
-                              await _findNearestCityAndUpdate(userLatLng);
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Error getting location: $e'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          child: Transform.rotate(
-                            angle: 45 * 3.14159 / 180,
-                            child: const Icon(Icons.navigation,
-                                color: Colors.white),
-                          ),
-                        ),
-                      ),
-
-                      Positioned(
-                        top: 16,
-                        left: 16,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.restaurant,
-                                  size: 16, color: Colors.blue),
-                              const SizedBox(width: 4),
-                              Text(
-                                "Total: ${_restaurantCountByCity.values.fold(0, (sum, count) => sum + count)} restaurants",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Zoom level indicator
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.8),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Zoom: ${_currentZoom.toStringAsFixed(1)}',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ),
-
-                      // Add debug overlay to show current view mode
-                      Positioned(
-                        top: 60,
-                        right: 16,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            _currentZoom < _cityClusterZoomThreshold
-                                ? "Cities View"
-                                : "Restaurants View",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  color: Colors.grey[100],
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // Zoom out to see all cities with counts
-                          setState(() {
-                            _currentZoom = 8.0; // Zoom level for overview
-                          });
-                          _mapController.move(
-                              const LatLng(zurichLat, zurichLng), 8.0);
-                          _loadAllRestaurants(); // Refresh data
-                        },
-                        icon: const Icon(Icons.public),
-                        label: const Text('All Cities'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          FloatingActionButton.small(
-                            heroTag: 'zoom_in',
-                            onPressed: _zoomIn,
-                            child: const Icon(Icons.add),
-                          ),
-                          const SizedBox(width: 8),
-                          FloatingActionButton.small(
-                            heroTag: 'zoom_out',
-                            onPressed: _zoomOut,
-                            child: const Icon(Icons.remove),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(
-            child: Text('Error loading cities data: $error'),
-          ),
-        );
+    return citiesAsync.when(
+      data: (cities) {
+        return _buildMapContent(sourceRestaurants, cities: cities);
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () {
+        // If we have restaurants already, show the map while cities load
+        if (sourceRestaurants.isNotEmpty) {
+          return _buildMapContent(sourceRestaurants);
+        }
+        return const Center(child: CircularProgressIndicator());
+      },
       error: (error, stack) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Error loading restaurants: $error'),
+            Text('Error loading cities data: $error'),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => ref.refresh(restaurantsNotifierProvider),
+              onPressed: () {
+                ref.refresh(citiesNotifierProvider);
+                _loadAllRestaurants(forceRefresh: true);
+              },
               child: const Text('Try Again'),
-            ),
+            )
           ],
         ),
       ),
+    );
+  }
+
+  // Extract the map building logic into a separate method
+  Widget _buildMapContent(List<Map<String, dynamic>> sourceRestaurants,
+      {List<dynamic>? cities}) {
+    List<Map<String, dynamic>> filteredRestaurants;
+
+    // Log the number of restaurants for debugging
+    print(
+        "MapWidget: Using ${sourceRestaurants.length} restaurants for filtering");
+
+    if (widget.chosenCity == 'Choose your city') {
+      // Show all if no city chosen (relevant for map view)
+      filteredRestaurants = sourceRestaurants;
+    } else {
+      // When zoomed in, show all restaurants in the chosen city
+      if (_currentZoom >= _cityClusterZoomThreshold) {
+        final chosenNormalized = _normalizeCityName(widget.chosenCity);
+        filteredRestaurants = sourceRestaurants.where((restaurant) {
+          final address =
+              _normalizeCityName((restaurant['address'] ?? '').toString());
+          final cityField =
+              _normalizeCityName((restaurant['city'] ?? '').toString());
+
+          // Always use normalized comparison for all cities
+          return address.contains(chosenNormalized) ||
+              cityField.contains(chosenNormalized);
+        }).toList();
+      } else {
+        // When zoomed out, don't show any individual restaurants (only clusters)
+        filteredRestaurants = [];
+      }
+    }
+
+    print("MapWidget Build: Zoom= ${_currentZoom.toStringAsFixed(2)}, Threshold= $_cityClusterZoomThreshold, " +
+        "Filtered Restaurants= ${filteredRestaurants.length}, ChosenCity= ${widget.chosenCity}");
+
+    return Column(
+      children: [
+        Expanded(
+          child: Stack(
+            children: [
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: const LatLng(zurichLat, zurichLng),
+                  initialZoom: _currentZoom,
+                  onMapEvent: (event) {
+                    // Update current zoom level when map changes
+                    if (event.source == MapEventSource.mapController ||
+                        event.source ==
+                            MapEventSource.flingAnimationController ||
+                        event.source ==
+                            MapEventSource.doubleTapZoomAnimationController ||
+                        event.source == MapEventSource.onDrag ||
+                        event.source == MapEventSource.onMultiFinger ||
+                        event.source == MapEventSource.mapController ||
+                        event.source == MapEventSource.scrollWheel) {
+                      final newZoom = event.camera.zoom;
+                      final wasShowingClusters =
+                          _currentZoom < _cityClusterZoomThreshold;
+                      final willShowClusters =
+                          newZoom < _cityClusterZoomThreshold;
+
+                      // Only rebuild if crossing the threshold or significant zoom change
+                      if (wasShowingClusters != willShowClusters ||
+                          (_currentZoom - newZoom).abs() > 0.1) {
+                        setState(() {
+                          _currentZoom = newZoom;
+                        });
+                      }
+                    }
+                  },
+                  minZoom: 5.0,
+                  maxZoom: 18.0,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                    subdomains: const ['a', 'b', 'c', 'd'],
+                    userAgentPackageName: 'com.dinedeals.app',
+                    retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
+                  ),
+                  if (_showUserLocation && _userLocation != null)
+                    CircleLayer(
+                      circles: [
+                        CircleMarker(
+                          point: _userLocation!,
+                          radius: 10,
+                          color: Colors.blue.withOpacity(0.7),
+                          borderColor: Colors.white,
+                          borderStrokeWidth: 2,
+                          useRadiusInMeter: false,
+                        ),
+                        CircleMarker(
+                          point: _userLocation!,
+                          radius: 30,
+                          color: Colors.blue.withOpacity(0.2),
+                          useRadiusInMeter: false,
+                        ),
+                      ],
+                    ),
+
+                  // City cluster layer (displayed when zoomed out)
+                  if (_currentZoom < _cityClusterZoomThreshold &&
+                      cities != null)
+                    MarkerLayer(
+                      key: const ValueKey("city-clusters"),
+                      markers: _createCityMarkers(
+                          cities.cast<Map<String, dynamic>>()),
+                    ),
+
+                  // Individual restaurants layer (displayed when zoomed in)
+                  if (_currentZoom >= _cityClusterZoomThreshold &&
+                      filteredRestaurants.isNotEmpty)
+                    MarkerLayer(
+                      key: const ValueKey("individual-restaurants"),
+                      markers: filteredRestaurants.map((restaurant) {
+                        // Log some restaurants for debugging
+                        if (filteredRestaurants.indexOf(restaurant) < 3) {
+                          print(
+                              "Creating marker for restaurant: ${restaurant['name']}");
+                        }
+
+                        // Parse coordinates more safely
+                        double? lat, lng;
+                        try {
+                          lat = double.tryParse(
+                                  restaurant['latitude']?.toString() ?? '') ??
+                              zurichLat;
+                          lng = double.tryParse(
+                                  restaurant['longitude']?.toString() ?? '') ??
+                              zurichLng;
+                        } catch (e) {
+                          print("Error parsing coordinates: $e");
+                          lat = zurichLat;
+                          lng = zurichLng;
+                        }
+
+                        final String name =
+                            restaurant['name'] ?? 'Unnamed Restaurant';
+                        final String address =
+                            restaurant['address'] ?? 'No address';
+
+                        return Marker(
+                          width: 120.0,
+                          height: 80.0,
+                          point: LatLng(lat, lng),
+                          child: GestureDetector(
+                            onTap: () {
+                              if (widget.onMarkerTapped != null) {
+                                widget.onMarkerTapped!(name);
+                              }
+
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text(name),
+                                  content: Text(address),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: const Text('Close'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            child: Column(
+                              children: [
+                                // Make marker more visible with a background
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 4,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.fastfood,
+                                    color: Colors.red,
+                                    size: 30,
+                                  ),
+                                ),
+                                // Show a bit of the name for identification
+                                if (name.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4, vertical: 2),
+                                    margin: const EdgeInsets.only(top: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.8),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      name.length > 12
+                                          ? '${name.substring(0, 10)}...'
+                                          : name,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                  // Attribution
+                  const RichAttributionWidget(
+                    alignment: AttributionAlignment.bottomLeft,
+                    animationConfig: ScaleRAWA(),
+                    attributions: [
+                      TextSourceAttribution('© OpenStreetMap contributors'),
+                      TextSourceAttribution('CARTO'),
+                    ],
+                  ),
+                ],
+              ),
+
+              // Loading indicator while getting all restaurants
+              if (_isFiltering ||
+                  (!_allRestaurantsLoaded &&
+                      widget.chosenCity == 'Choose your city'))
+                Positioned(
+                  top: 60,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Theme.of(context).primaryColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "Loading restaurants...",
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              Positioned(
+                right: 16,
+                bottom: 20,
+                child: FloatingActionButton(
+                  heroTag: 'locate_me',
+                  mini: true,
+                  shape: const CircleBorder(),
+                  backgroundColor: Colors.blue,
+                  elevation: 0,
+                  onPressed: () async {
+                    try {
+                      final position = await Geolocator.getCurrentPosition(
+                        locationSettings: const LocationSettings(
+                          accuracy: LocationAccuracy.high,
+                        ),
+                      );
+                      final userLatLng =
+                          LatLng(position.latitude, position.longitude);
+
+                      // Update the user location marker
+                      setState(() {
+                        _userLocation = userLatLng;
+                        _showUserLocation = true;
+                        _currentZoom = 15.0;
+                      });
+
+                      // Move map to user location
+                      _mapController.move(userLatLng, 15.0);
+
+                      // Find nearest city and update the provider
+                      await _findNearestCityAndUpdate(userLatLng);
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error getting location: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: Transform.rotate(
+                    angle: 45 * 3.14159 / 180,
+                    child: const Icon(Icons.navigation, color: Colors.white),
+                  ),
+                ),
+              ),
+
+              Positioned(
+                top: 16,
+                left: 16,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.restaurant,
+                          size: 16, color: Colors.blue),
+                      const SizedBox(width: 4),
+                      Text(
+                        "Total: ${_restaurantCountByCity.values.fold(0, (sum, count) => sum + count)} restaurants",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Zoom level indicator
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Zoom: ${_currentZoom.toStringAsFixed(1)}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ),
+
+              // Add debug overlay to show current view mode
+              Positioned(
+                top: 60,
+                right: 16,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _currentZoom < _cityClusterZoomThreshold
+                        ? "Cities View"
+                        : "Restaurants View",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Bottom controls
+        Container(
+          color: Colors.grey[100],
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Zoom out to see all cities with counts
+                  setState(() {
+                    _currentZoom = 8.0; // Zoom level for overview
+                  });
+                  _mapController.move(const LatLng(zurichLat, zurichLng), 8.0);
+                  _loadAllRestaurants(
+                      forceRefresh: false); // Use cached data if available
+                },
+                icon: const Icon(Icons.public),
+                label: const Text('All Cities'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+              Row(
+                children: [
+                  FloatingActionButton.small(
+                    heroTag: 'zoom_in',
+                    onPressed: _zoomIn,
+                    child: const Icon(Icons.add),
+                  ),
+                  const SizedBox(width: 8),
+                  FloatingActionButton.small(
+                    heroTag: 'zoom_out',
+                    onPressed: _zoomOut,
+                    child: const Icon(Icons.remove),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

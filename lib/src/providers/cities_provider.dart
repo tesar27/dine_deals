@@ -42,6 +42,19 @@ class CitiesNotifier extends _$CitiesNotifier {
   PostgrestList? _cachedData;
   static const String _cacheKey = 'cities_cache';
 
+  // Helper function to de-duplicate cities based on name
+  PostgrestList _deduplicateCities(PostgrestList cities) {
+    final seenNames = <String>{};
+    final uniqueCities = cities.where((city) {
+      final name = city['name'] as String?;
+      if (name != null && seenNames.add(name)) {
+        return true; // Keep it if the name is new
+      }
+      return false; // Discard if name is null or already seen
+    }).toList();
+    return PostgrestList.from(uniqueCities);
+  }
+
   @override
   Future<PostgrestList> build() async {
     final prefs = await SharedPreferences.getInstance();
@@ -50,7 +63,9 @@ class CitiesNotifier extends _$CitiesNotifier {
     if (cachedJson != null) {
       try {
         final List<dynamic> decoded = jsonDecode(cachedJson);
-        _cachedData = PostgrestList.from(decoded);
+        final uniqueCities =
+            _deduplicateCities(PostgrestList.from(decoded)); // De-duplicate
+        _cachedData = uniqueCities;
         print("CitiesNotifier: Returning data from SharedPreferences");
         return _cachedData!;
       } catch (e) {
@@ -60,27 +75,23 @@ class CitiesNotifier extends _$CitiesNotifier {
     }
 
     try {
-      // .single() returns the Map directly on success or throws on error
       final citiesData = await Supabase.instance.client
           .from('cities')
           .select()
-          .order('name',
-              ascending:
-                  true); // Optional: Order by name // Selects all columns by default
-      // Returns PostgrestMap (Map<String, dynamic>) or throws PostgrestException
+          .order('name', ascending: true);
 
-      print(
-          "CitiesNotifier: Cities data fetched successfully."); // Optional: for debugging
-      // If we reach here, the query was successful and citiesData is the Map
-      // Save to SharedPreferences
+      final uniqueCities = _deduplicateCities(citiesData); // De-duplicate
+
+      print("CitiesNotifier: Cities data fetched successfully.");
       try {
-        await prefs.setString(_cacheKey, jsonEncode(citiesData));
+        await prefs.setString(
+            _cacheKey, jsonEncode(uniqueCities)); // Cache unique list
         print("CitiesNotifier: Data saved to SharedPreferences");
       } catch (e) {
         print("CitiesNotifier: Error saving to SharedPreferences: $e");
       }
-      _cachedData = citiesData;
-      return citiesData; // Type is already Map<String, dynamic>
+      _cachedData = uniqueCities;
+      return uniqueCities;
     } on PostgrestException catch (error) {
       // Handle specific Supabase errors
       print(
@@ -101,19 +112,19 @@ class CitiesNotifier extends _$CitiesNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Fetch fresh data from Supabase
       final citiesData = await Supabase.instance.client
           .from('cities')
           .select()
           .order('name', ascending: true);
 
-      // Cache the data
-      await prefs.setString(_cacheKey, jsonEncode(citiesData));
+      final uniqueCities = _deduplicateCities(citiesData); // De-duplicate
+
+      await prefs.setString(
+          _cacheKey, jsonEncode(uniqueCities)); // Cache unique list
       print("CitiesNotifier: Refreshed and cached cities data");
 
-      // Update state with new data
-      _cachedData = citiesData;
-      state = AsyncData(citiesData);
+      _cachedData = uniqueCities;
+      state = AsyncData(uniqueCities);
     } catch (error) {
       print("CitiesNotifier: Failed to refresh cities: $error");
       state = AsyncError(error, StackTrace.current);
