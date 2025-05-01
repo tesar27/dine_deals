@@ -11,7 +11,7 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
-  bool _loading = false;
+  final bool _loading = false;
   String? _firstName;
   String? _lastName;
   String? _avatarUrl;

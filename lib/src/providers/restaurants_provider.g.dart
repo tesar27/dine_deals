@@ -7,7 +7,7 @@ part of 'restaurants_provider.dart';
 // **************************************************************************
 
 String _$restaurantsNotifierHash() =>
-    r'f519c535df27fb864e18a5a40df98d535f0e02eb';
+    r'07aa0e5b236ee6c8845413b6a8a827a9152997ff';
 
 /// See also [RestaurantsNotifier].
 @ProviderFor(RestaurantsNotifier)
