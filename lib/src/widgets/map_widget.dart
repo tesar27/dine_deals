@@ -77,11 +77,18 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
     super.didUpdateWidget(oldWidget);
 
     // Only reload if the city changes, not just visibility
-    if (widget.chosenCity != oldWidget.chosenCity &&
-        widget.chosenCity != 'Choose your city') {
-      Future.delayed(Duration.zero, () {
-        if (mounted) {
+    if ((widget.isVisible && !oldWidget.isVisible) ||
+        (widget.chosenCity != oldWidget.chosenCity)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        // 1) reload all restaurants & regroup by city
+        _loadAllRestaurants(forceRefresh: false);
+        // 2) recenter and bump zoom if a city was chosen
+        if (widget.chosenCity != 'Choose your city') {
           _centerOnChosenCity();
+          setState(() {
+            _currentZoom = _cityClusterZoomThreshold + 0.5;
+          });
         }
       });
     }
@@ -642,9 +649,8 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                       ],
                     ),
 
-                  // City cluster layer (displayed when zoomed out)
-                  if (_currentZoom < _cityClusterZoomThreshold &&
-                      cities != null)
+                  // City cluster layer (always displayed, with grouped counts)
+                  if (cities != null)
                     MarkerLayer(
                       key: const ValueKey("city-clusters"),
                       markers: _createCityMarkers(
