@@ -1,3 +1,4 @@
+import 'package:dine_deals/src/widgets/map_bottom_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -435,23 +436,6 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    cityName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 10,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -695,24 +679,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                           point: LatLng(lat, lng),
                           child: GestureDetector(
                             onTap: () {
-                              if (widget.onMarkerTapped != null) {
-                                widget.onMarkerTapped!(name);
-                              }
-
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text(name),
-                                  content: Text(address),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: const Text('Close'),
-                                    ),
-                                  ],
-                                ),
-                              );
+                              _showRestaurantCard(context, restaurant);
                             },
                             child: Column(
                               children: [
@@ -736,27 +703,6 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                                     size: 30,
                                   ),
                                 ),
-                                // Show a bit of the name for identification
-                                if (name.isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 4, vertical: 2),
-                                    margin: const EdgeInsets.only(top: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.8),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      name.length > 12
-                                          ? '${name.substring(0, 10)}...'
-                                          : name,
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
@@ -950,47 +896,17 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
           ),
         ),
         // Bottom controls
-        Container(
-          color: Colors.grey[100],
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              ElevatedButton.icon(
-                onPressed: () {
-                  // Zoom out to see all cities with counts
-                  setState(() {
-                    _currentZoom = 8.0; // Zoom level for overview
-                  });
-                  _mapController.move(const LatLng(zurichLat, zurichLng), 8.0);
-                  _loadAllRestaurants(
-                      forceRefresh: false); // Use cached data if available
-                },
-                icon: const Icon(Icons.public),
-                label: const Text('All Cities'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-              Row(
-                children: [
-                  FloatingActionButton.small(
-                    heroTag: 'zoom_in',
-                    onPressed: _zoomIn,
-                    child: const Icon(Icons.add),
-                  ),
-                  const SizedBox(width: 8),
-                  FloatingActionButton.small(
-                    heroTag: 'zoom_out',
-                    onPressed: _zoomOut,
-                    child: const Icon(Icons.remove),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+        // MapBottomControls(
+        //   onAllCities: () {
+        //     setState(() {
+        //       _currentZoom = 8.0;
+        //     });
+        //     _mapController.move(const LatLng(zurichLat, zurichLng), 8.0);
+        //     _loadAllRestaurants(forceRefresh: false);
+        //   },
+        //   onZoomIn: _zoomIn,
+        //   onZoomOut: _zoomOut,
+        // ),
       ],
     );
   }
@@ -1082,5 +998,134 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         );
       }
     }
+  }
+
+  void _showRestaurantCard(
+      BuildContext context, Map<String, dynamic> restaurant) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.transparent,
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.only(
+              bottom: 135), // Above filter/list-map buttons
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.85,
+              child: Material(
+                elevation: 10,
+                borderRadius: BorderRadius.circular(16),
+                color: Colors.white,
+                child: SingleChildScrollView(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Image
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            restaurant['imageUrl'] ??
+                                'https://kpceyekfdauxsbljihst.supabase.co/storage/v1/object/public/pictures//cheeseburger-7580676_1280.jpg',
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 100,
+                                height: 100,
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.restaurant,
+                                    color: Colors.grey),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Details
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Title
+                              Text(
+                                restaurant['name'] ?? 'No name',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              // Stars, distance, address
+                              Row(
+                                children: [
+                                  const Icon(Icons.star,
+                                      size: 16, color: Colors.amber),
+                                  Text(' ${restaurant['rating'] ?? '4.5'} · '),
+                                  if (restaurant['distance'] != null)
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.directions,
+                                            size: 16, color: Colors.blue),
+                                        Text(
+                                            ' ${(restaurant['distance'] as double).toStringAsFixed(1)} km · '),
+                                      ],
+                                    ),
+                                  const Icon(Icons.location_on,
+                                      size: 16, color: Colors.grey),
+                                  Expanded(
+                                    child: Text(
+                                      restaurant['address']?.split(',').first ??
+                                          'No address',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              // Offers
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: (restaurant['deals'] as List? ?? [])
+                                    .take(3)
+                                    .map((deal) => Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green[100],
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            deal['name']?.toString() ??
+                                                'Special Offer',
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.black87),
+                                          ),
+                                        ))
+                                    .toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
