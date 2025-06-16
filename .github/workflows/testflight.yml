@@ -30,19 +30,11 @@ jobs:
           p12-file-base64: ${{ secrets.IOS_CERTIFICATE_P12 }}
           p12-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
 
-      - name: Setup provisioning profile
-        uses: apple-actions/download-provisioning-profiles@v2
-        with:
-          bundle-id: com.yerbolat.dinedeals
-          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
-          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
-          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
-
       - name: Build iOS with code signing
         run: |
           flutter build ios --release
           cd ios
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -archivePath Runner.xcarchive archive
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -archivePath Runner.xcarchive archive -allowProvisioningUpdates
           xcodebuild -exportArchive -archivePath Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist exportOptions.plist
 
       - name: Build and upload to TestFlight
