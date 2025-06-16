@@ -25,6 +25,21 @@ jobs:
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
 
+      - name: Auto-increment build number
+        run: |
+          # Get current build number from pubspec.yaml
+          current_version=$(grep "version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          current_build=$(grep "version:" pubspec.yaml | sed 's/.*+//')
+
+          # Increment build number
+          new_build=$((current_build + 1))
+          new_version="$current_version+$new_build"
+
+          # Update pubspec.yaml
+          sed -i '' "s/version: .*/version: $new_version/" pubspec.yaml
+
+          echo "Updated version to: $new_version"
+
       - name: Build iOS
         run: |
           flutter build ios --release --no-codesign
