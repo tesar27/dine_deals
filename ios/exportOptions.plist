@@ -3,13 +3,16 @@
 <plist version="1.0">
 <dict>
     <key>method</key>
-    <string>development</string>
+    <string>app-store</string>
+    <key>destination</key>
+    <string>upload</string>
+    <key>uploadBitcode</key>
+    <false/>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>compileBitcode</key>
+    <false/>
     <key>teamID</key>
-    <string>72T58MDJZ9</string> <!-- Your team ID from the project file -->
-    <key>provisioningProfiles</key>
-    <dict>
-        <key>com.yerbolat.dinedeals</key>
-        <string>Your Provisioning Profile Name</string>
-    </dict>
+    <string>72T58MDJZ9</string>
 </dict>
 </plist>

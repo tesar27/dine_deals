@@ -21,18 +21,29 @@ jobs:
         run: |
           echo "OPENCAGE_API=${{ secrets.OPENCAGE_API }}" > .env
           echo "OPENCAGE_URL=${{ secrets.OPENCAGE_URL }}" >> .env
-          echo "GOOGLE_OAUTH=${{ secrets.GOOGLE_OAUTH }}" >> .env
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
 
-      - name: Build iOS
+      - name: Setup iOS certificates and provisioning
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.IOS_CERTIFICATE_P12 }}
+          p12-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+
+      - name: Setup provisioning profile
+        uses: apple-actions/download-provisioning-profiles@v2
+        with:
+          bundle-id: com.yerbolat.dinedeals
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+
+      - name: Build iOS with code signing
         run: |
-          flutter build ios --release --no-codesign
-          mkdir -p build/ios/ipa
-          cd build/ios/iphoneos
-          mkdir Payload
-          cp -r Runner.app Payload/
-          zip -r ../ipa/Runner.ipa Payload/
+          flutter build ios --release
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -archivePath Runner.xcarchive archive
+          xcodebuild -exportArchive -archivePath Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist ExportOptions.plist
 
       - name: Build and upload to TestFlight
         uses: Apple-Actions/upload-testflight-build@v1
