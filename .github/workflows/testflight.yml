@@ -17,6 +17,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Create .env from secrets
+        run: |
+          echo "OPENCAGE_API=${{ secrets.OPENCAGE_API }}" > .env
+          echo "OPENCAGE_URL=${{ secrets.OPENCAGE_URL }}" >> .env
+          echo "GOOGLE_OAUTH=${{ secrets.GOOGLE_OAUTH }}" >> .env
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+
       - name: Build iOS
         run: flutter build ios --release --no-codesign
 
