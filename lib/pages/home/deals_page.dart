@@ -1,14 +1,14 @@
-import 'package:dine_deals/src/providers/cities_provider.dart';
-import 'package:dine_deals/src/providers/location_provider.dart';
-import 'package:dine_deals/src/providers/restaurants_provider.dart';
-import 'package:dine_deals/src/providers/deals_provider.dart';
-import 'package:dine_deals/src/widgets/map_widget.dart';
+import 'package:dine_deals/providers/cities_provider.dart';
+import 'package:dine_deals/providers/location_provider.dart';
+import 'package:dine_deals/providers/restaurants_provider.dart';
+import 'package:dine_deals/providers/deals_provider.dart';
+import 'package:dine_deals/widgets/map_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:dine_deals/src/pages/details/place_details.dart';
+import 'package:dine_deals/pages/details/place_details.dart';
 
 class DealsPage extends ConsumerStatefulWidget {
   const DealsPage({super.key});

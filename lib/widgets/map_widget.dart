@@ -1,11 +1,11 @@
-import 'package:dine_deals/src/widgets/map_bottom_controls.dart';
+import 'package:dine_deals/widgets/map_bottom_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:dine_deals/src/providers/restaurants_provider.dart';
-import 'package:dine_deals/src/providers/cities_provider.dart';
+import 'package:dine_deals/providers/restaurants_provider.dart';
+import 'package:dine_deals/providers/cities_provider.dart';
 
 class MapWidget extends ConsumerStatefulWidget {
   final Function(String)? onMarkerTapped;

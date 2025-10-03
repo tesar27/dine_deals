@@ -1,10 +1,10 @@
-import 'package:dine_deals/src/pages/details/edit_place_details.dart';
+import 'package:dine_deals/pages/details/edit_place_details.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dine_deals/src/providers/deals_provider.dart';
+import 'package:dine_deals/providers/deals_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:dine_deals/src/providers/user_provider.dart';
+import 'package:dine_deals/providers/user_provider.dart';
 
 class PlaceDetails extends ConsumerStatefulWidget {
   final Map<String, dynamic> restaurant;

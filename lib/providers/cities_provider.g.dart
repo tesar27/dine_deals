@@ -6,7 +6,7 @@ part of 'cities_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$citiesNotifierHash() => r'1d7ce9218e401fa54d320842ed97caaaa5b8bdf4';
+String _$citiesNotifierHash() => r'2bbe0195364c8e85776ff03050596059c761499d';
 
 /// See also [CitiesNotifier].
 @ProviderFor(CitiesNotifier)

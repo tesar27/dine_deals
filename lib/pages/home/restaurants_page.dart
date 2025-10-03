@@ -1,4 +1,4 @@
-import 'package:dine_deals/src/widgets/map_screen.dart';
+import 'package:dine_deals/widgets/map_screen.dart';
 import 'package:flutter/material.dart';
 
 class RestaurantsPage extends StatelessWidget {

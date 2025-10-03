@@ -1,10 +1,10 @@
-import 'package:dine_deals/src/pages/home/admin_page.dart';
-import 'package:dine_deals/src/providers/theme_provider.dart';
-import 'package:dine_deals/src/providers/user_provider.dart';
+import 'package:dine_deals/pages/home/admin_page.dart';
+import 'package:dine_deals/providers/theme_provider.dart';
+import 'package:dine_deals/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dine_deals/main.dart';
-import 'package:dine_deals/src/pages/auth/auth_page.dart';
+import 'package:dine_deals/pages/auth/auth_page.dart';
 import 'dart:math' as math;
 
 class AccountPage extends ConsumerStatefulWidget {

@@ -1,6 +1,6 @@
 import 'package:dine_deals/main.dart';
-import 'package:dine_deals/src/pages/auth/auth_page.dart';
-import 'package:dine_deals/src/pages/home/home_page.dart';
+import 'package:dine_deals/pages/auth/auth_page.dart';
+import 'package:dine_deals/pages/home/home_page.dart';
 import 'package:flutter/material.dart';
 
 class AccountPage extends StatefulWidget {

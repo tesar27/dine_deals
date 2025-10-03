@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/main.dart';
-import 'package:dine_deals/src/pages/home/home_page.dart';
+import 'package:dine_deals/pages/home/home_page.dart';
 
 class ProfileSetupPage extends StatefulWidget {
   const ProfileSetupPage({super.key});

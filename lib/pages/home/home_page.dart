@@ -1,9 +1,9 @@
-import 'package:dine_deals/src/providers/user_provider.dart';
-import 'package:dine_deals/src/pages/home/bookings_page.dart';
-import 'package:dine_deals/src/pages/home/news_page.dart';
+import 'package:dine_deals/providers/user_provider.dart';
+import 'package:dine_deals/pages/home/bookings_page.dart';
+import 'package:dine_deals/pages/home/news_page.dart';
 import 'package:flutter/material.dart';
-import 'package:dine_deals/src/pages/home/account_page.dart';
-import 'package:dine_deals/src/pages/home/deals_page.dart';
+import 'package:dine_deals/pages/home/account_page.dart';
+import 'package:dine_deals/pages/home/deals_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class HomePage extends ConsumerStatefulWidget {

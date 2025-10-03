@@ -1,5 +1,5 @@
-import 'package:dine_deals/src/pages/details/offer_details_page.dart';
-import 'package:dine_deals/src/widgets/page_route_with_fade_transition.dart';
+import 'package:dine_deals/pages/details/offer_details_page.dart';
+import 'package:dine_deals/widgets/page_route_with_fade_transition.dart';
 import 'package:flutter/material.dart';
 
 class OffersList extends StatelessWidget {

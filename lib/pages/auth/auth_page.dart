@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:dine_deals/src/pages/auth/profile_setup_page.dart';
-import 'package:dine_deals/src/pages/home/home_page.dart';
+import 'package:dine_deals/pages/auth/profile_setup_page.dart';
+import 'package:dine_deals/pages/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

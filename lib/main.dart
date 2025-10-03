@@ -1,8 +1,8 @@
-import 'package:dine_deals/src/pages/auth/auth_page.dart';
-import 'package:dine_deals/src/pages/home/home_page.dart';
-import 'package:dine_deals/src/providers/theme/app_theme.dart';
-import 'package:dine_deals/src/providers/theme_provider.dart';
-import 'package:dine_deals/src/config/config.dart';
+import 'package:dine_deals/pages/auth/auth_page.dart';
+import 'package:dine_deals/pages/home/home_page.dart';
+import 'package:dine_deals/theme/app_theme.dart';
+import 'package:dine_deals/providers/theme_provider.dart';
+import 'package:dine_deals/config/config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

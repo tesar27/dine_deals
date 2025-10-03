@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:dine_deals/src/utils/constants.dart';
+import 'package:dine_deals/utils/constants.dart';
 import 'package:dine_deals/main.dart';
-import 'package:dine_deals/src/pages/auth/auth_page.dart';
-import 'package:dine_deals/src/pages/home/account_page.dart';
+import 'package:dine_deals/pages/auth/auth_page.dart';
+import 'package:dine_deals/pages/home/account_page.dart';
 
 /// Page to redirect users to the appropriate page depending on the initial auth state
 class SplashPage extends StatefulWidget {

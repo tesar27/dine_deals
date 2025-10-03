@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dine_deals/src/providers/restaurants_provider.dart';
-import 'package:dine_deals/src/pages/details/edit_place_details.dart';
+import 'package:dine_deals/providers/restaurants_provider.dart';
+import 'package:dine_deals/pages/details/edit_place_details.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 

@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/main.dart';
-import 'package:dine_deals/src/pages/auth/signin_page.dart';
-import 'package:dine_deals/src/pages/home/account_page.dart';
+import 'package:dine_deals/pages/auth/signin_page.dart';
+import 'package:dine_deals/pages/home/account_page.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
