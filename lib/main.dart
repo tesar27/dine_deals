@@ -1,18 +1,32 @@
-import 'package:dine_deals/pages/auth/auth_page.dart';
-import 'package:dine_deals/pages/home/home_page.dart';
-import 'package:dine_deals/theme/app_theme.dart';
-import 'package:dine_deals/providers/theme_provider.dart';
 import 'package:dine_deals/config/config.dart';
+import 'package:dine_deals/pages/splash_page.dart';
+import 'package:dine_deals/providers/theme_provider.dart';
+import 'package:dine_deals/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+/// Global Supabase client instance
+final supabase = Supabase.instance.client;
+
+/// Check if user is currently signed in
+bool get isUserSignedIn => supabase.auth.currentUser != null;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Set preferred orientations
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Load environment variables
   await dotenv.load(fileName: ".env");
 
+  // Initialize Supabase
   await Supabase.initialize(
     url: Config.supabaseUrl,
     anonKey: Config.supabaseAnonKey,
@@ -20,20 +34,13 @@ Future<void> main() async {
 
   runApp(
     const ProviderScope(
-      child: MyApp(),
+      child: DineDealsApp(),
     ),
   );
 }
 
-final supabase = Supabase.instance.client;
-
-// Add this function to check if user is signed in
-bool isUserSignedIn() {
-  return supabase.auth.currentUser != null;
-}
-
-class MyApp extends ConsumerWidget {
-  const MyApp({super.key});
+class DineDealsApp extends ConsumerWidget {
+  const DineDealsApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,46 +48,26 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp(
       title: 'Dine Deals',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
-      home: const AuthPage(),
+      home: const SplashPage(),
+      // Add error handling
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler:
+                const TextScaler.linear(1.0), // Prevent text scaling issues
+          ),
+          child: child!,
+        );
+      },
     );
   }
 }
 
-class SplashPage extends StatefulWidget {
-  const SplashPage({super.key});
-
-  @override
-  _SplashPageState createState() => _SplashPageState();
-}
-
-class _SplashPageState extends State<SplashPage> {
-  @override
-  void initState() {
-    super.initState();
-    _redirect();
-  }
-
-  Future<void> _redirect() async {
-    // Wait for any initializations if needed
-    await Future.delayed(const Duration(milliseconds: 100));
-
-    // Redirect to the appropriate page
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO: implement build
-    throw UnimplementedError();
-  }
-}
+// SplashPage is imported from pages/splash_page.dart
 
 extension ContextExtension on BuildContext {
   void showSnackBar(String message, {bool isError = false}) {

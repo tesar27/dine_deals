@@ -1,40 +1,79 @@
 import 'package:flutter/material.dart';
-import 'package:dine_deals/utils/constants.dart';
 import 'package:dine_deals/main.dart';
 import 'package:dine_deals/pages/auth/auth_page.dart';
-import 'package:dine_deals/pages/home/account_page.dart';
+import 'package:dine_deals/pages/home/home_page.dart';
+import 'package:dine_deals/widgets/app_components.dart';
 
-/// Page to redirect users to the appropriate page depending on the initial auth state
+/// Optimized splash page with proper navigation handling
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
   @override
-  SplashPageState createState() => SplashPageState();
+  State<SplashPage> createState() => _SplashPageState();
 }
 
-class SplashPageState extends State<SplashPage> {
+class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
     super.initState();
-    _redirect();
+    _initializeApp();
   }
 
-  Future<void> _redirect() async {
-    // await for for the widget to mount
-    await Future.delayed(Duration.zero);
+  Future<void> _initializeApp() async {
+    // Small delay to show splash screen
+    await Future.delayed(const Duration(milliseconds: 1500));
 
+    if (!mounted) return;
+
+    // Check authentication state
     final session = supabase.auth.currentSession;
-    if (session == null) {
-      Navigator.of(context)
-          .pushAndRemoveUntil(AuthPage.route(), (route) => false);
-    } else {
-      Navigator.of(context)
-          .pushAndRemoveUntil(AccountPage.route(), (route) => false);
-    }
+    
+    // Navigate to appropriate page
+    final targetRoute = session != null 
+        ? MaterialPageRoute(builder: (_) => const HomePage())
+        : MaterialPageRoute(builder: (_) => const AuthPage());
+
+    Navigator.of(context).pushReplacement(targetRoute);
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: preloader);
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.restaurant_menu,
+              size: 80,
+              color: Colors.white,
+            ),
+            SizedBox(height: 24),
+            Text(
+              'Dine Deals',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Discover amazing deals nearby',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white70,
+              ),
+            ),
+            SizedBox(height: 48),
+            AppLoadingIndicator(
+              color: Colors.white,
+              size: 32,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

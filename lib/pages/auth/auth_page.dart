@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:dine_deals/pages/auth/profile_setup_page.dart';
-import 'package:dine_deals/pages/home/home_page.dart';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:dine_deals/main.dart';
+import 'package:dine_deals/pages/auth/profile_setup_page.dart';
+import 'package:dine_deals/pages/home/home_page.dart';
+import 'package:dine_deals/widgets/app_components.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -21,10 +24,10 @@ class AuthPage extends StatefulWidget {
 enum AuthMode { signIn, signUp, forgotPassword }
 
 class _AuthPageState extends State<AuthPage> {
-  bool _isLoading = true; // Start with loading to check auth status
+  bool _isLoading = true;
   bool _isSent = false;
-  // ignore: unused_field
-  bool _hasError = false;
+  String? _errorMessage;
+  
   late final TextEditingController _emailController = TextEditingController();
   late final TextEditingController _otpController = TextEditingController();
   late final TextEditingController _passwordController =
@@ -158,7 +161,7 @@ class _AuthPageState extends State<AuthPage> {
       setState(() {
         _isLoading = true;
         _isSent = true;
-        _hasError = false;
+        _errorMessage = null;
       });
       await supabase.auth.signInWithOtp(
         email: _emailController.text.trim(),
@@ -170,14 +173,14 @@ class _AuthPageState extends State<AuthPage> {
       if (mounted) {
         context.showSnackBar(error.message, isError: true);
         setState(() {
-          _hasError = true;
+          _errorMessage = "An error occurred";
         });
       }
     } catch (error) {
       if (mounted) {
         context.showSnackBar('Unexpected error occurred', isError: true);
         setState(() {
-          _hasError = true;
+          _errorMessage = "An error occurred";
         });
       }
     } finally {
@@ -215,14 +218,14 @@ class _AuthPageState extends State<AuthPage> {
       if (mounted) {
         context.showSnackBar(error.message, isError: true);
         setState(() {
-          _hasError = true;
+          _errorMessage = "An error occurred";
         });
       }
     } catch (error) {
       if (mounted) {
         context.showSnackBar('Unexpected error occurred', isError: true);
         setState(() {
-          _hasError = true;
+          _errorMessage = "An error occurred";
         });
       }
     } finally {
@@ -282,7 +285,7 @@ class _AuthPageState extends State<AuthPage> {
     setState(() {
       _currentMode = mode;
       _isSent = false;
-      _hasError = false;
+      _errorMessage = null;
       _otpController.clear();
     });
   }
@@ -290,7 +293,7 @@ class _AuthPageState extends State<AuthPage> {
   void _tryAgain() {
     setState(() {
       _isSent = false;
-      _hasError = false;
+      _errorMessage = null;
       _otpController.clear();
     });
   }

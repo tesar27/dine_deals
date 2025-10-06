@@ -1,7 +1,5 @@
-import 'package:dine_deals/providers/cities_provider.dart';
 import 'package:dine_deals/providers/location_provider.dart';
-import 'package:dine_deals/providers/restaurants_provider.dart';
-import 'package:dine_deals/providers/deals_provider.dart';
+import 'package:dine_deals/providers/app_data_provider.dart';
 import 'package:dine_deals/widgets/map_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dine_deals/providers/deals_provider.dart';
-import 'package:dine_deals/providers/restaurants_provider.dart';
+import 'package:dine_deals/providers/user_provider.dart';
+import 'package:dine_deals/providers/app_data_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
