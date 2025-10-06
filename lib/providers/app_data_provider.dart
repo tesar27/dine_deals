@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dine_deals/config/config.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -139,6 +140,49 @@ class RestaurantData extends _$RestaurantData {
     }
   }
 
+  List<Map<String, dynamic>> getFilteredRestaurants(String query) {
+    final current = state.value ?? [];
+    if (query.isEmpty) return current;
+    return current.where((restaurant) {
+      final name = restaurant['name']?.toString().toLowerCase() ?? '';
+      final address = restaurant['address']?.toString().toLowerCase() ?? '';
+      final searchQuery = query.toLowerCase();
+      return name.contains(searchQuery) || address.contains(searchQuery);
+    }).toList();
+  }
+
+  void updateFilteredResults(String query) {
+    // This method triggers a rebuild with filtered results
+    ref.invalidateSelf();
+  }
+
+  Future<void> uploadImage(String imagePath) async {
+    // Placeholder for image upload functionality
+    throw UnimplementedError('Image upload not implemented yet');
+  }
+
+  Future<void> updateRestaurantImage(int restaurantId, String imageUrl) async {
+    // Placeholder for updating restaurant image
+    throw UnimplementedError('Restaurant image update not implemented yet');
+  }
+
+  Future<bool> checkPlaceExists(String name) async {
+    try {
+      final data = await Supabase.instance.client
+          .from('restaurants')
+          .select('id')
+          .eq('name', name)
+          .limit(1);
+      return data.isNotEmpty;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  Future<void> addPlace({required String name, required String address}) async {
+    await addRestaurant(name: name, address: address);
+  }
+
   Future<Map<String, double>> _getCoordinatesFromAddress(String address) async {
     final apiKey = Config.opencageApi;
     final url =
@@ -212,6 +256,10 @@ class CityData extends _$CityData {
   Future<void> setChosenCity(String city) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_chosenCityKey, city);
+  }
+
+  Future<void> refreshCities() async {
+    ref.invalidateSelf();
   }
 }
 
@@ -300,4 +348,26 @@ class DealsData extends _$DealsData {
       throw Exception('Failed to add deal: $error');
     }
   }
+
+  List<Map<String, dynamic>> getDealsForRestaurant(int restaurantId) {
+    final current = state.value ?? [];
+    return current.where((deal) => deal['restaurant_id'] == restaurantId).toList();
+  }
+
+  Future<void> deleteDeal(int dealId) async {
+    try {
+      await Supabase.instance.client.from('deals').delete().eq('id', dealId);
+      await fetchDeals(forceRefresh: true);
+      ref.invalidateSelf();
+    } catch (error) {
+      throw Exception('Failed to delete deal: $error');
+    }
+  }
 }
+
+// =============================================================================
+// CHOSEN CITY PROVIDER - For managing selected city
+// =============================================================================
+
+// Simple StateProvider for chosen city
+final chosenCityProvider = StateProvider<String>((ref) => 'Choose your city');

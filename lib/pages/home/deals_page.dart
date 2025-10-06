@@ -147,7 +147,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
     try {
       final restaurantsNotifier =
-          ref.read(restaurantsNotifierProvider.notifier);
+          ref.read(restaurantDataProvider.notifier);
       final allRestaurants = await restaurantsNotifier.fetchRestaurants();
 
       if (!mounted || _isDisposed) return;
@@ -187,7 +187,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
   void _showCitiesList(List<String> cities) {
     // First, refresh cities to get the latest data
-    ref.read(citiesNotifierProvider.notifier).refreshCities();
+    ref.read(cityDataProvider.notifier).refreshCities();
 
     showModalBottomSheet(
       context: context,
@@ -230,7 +230,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                         onPressed: () {
                           // Refresh cities data
                           ref
-                              .read(citiesNotifierProvider.notifier)
+                              .read(cityDataProvider.notifier)
                               .refreshCities();
                         },
                       ),
@@ -524,7 +524,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     try {
       // Get the restaurants provider
       final restaurantsNotifier =
-          ref.read(restaurantsNotifierProvider.notifier);
+          ref.read(restaurantDataProvider.notifier);
 
       // Get category filter (null if "All" is selected)
       final categoryFilter = _selectedCategories.contains("All")
@@ -543,7 +543,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       if (!mounted || _isDisposed) return;
 
       // For each restaurant, fetch its deals
-      final dealsNotifier = ref.read(dealsNotifierProvider.notifier);
+      final dealsNotifier = ref.read(dealsDataProvider.notifier);
       List<Map<String, dynamic>> restaurantsWithDeals = [];
 
       for (var restaurant
@@ -630,7 +630,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     });
 
     try {
-      final citiesAsync = ref.read(citiesNotifierProvider);
+      final citiesAsync = ref.read(cityDataProvider);
 
       final cities = await citiesAsync.when(
         data: (data) => Future.value(data),
@@ -748,7 +748,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final citiesAsync = ref.watch(citiesNotifierProvider);
+    final citiesAsync = ref.watch(cityDataProvider);
     final chosenCity = ref.watch(chosenCityProvider);
 
     return Scaffold(

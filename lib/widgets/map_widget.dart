@@ -118,7 +118,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
       try {
         // Step 1: Get cities data first
-        final citiesAsync = ref.read(citiesNotifierProvider);
+        final citiesAsync = ref.read(cityDataProvider);
         final cities = await citiesAsync.when(
           data: (data) => Future.value(data),
           loading: () => Future.delayed(
@@ -130,7 +130,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
         // Step 2: Get restaurants data - use the passed forceRefresh parameter
         final restaurantsNotifier =
-            ref.read(restaurantsNotifierProvider.notifier);
+            ref.read(restaurantDataProvider.notifier);
         final allRestaurantsData = await restaurantsNotifier.fetchRestaurants(
             forceRefresh: forceRefresh);
 
@@ -278,7 +278,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
     print("Centering on city: ${widget.chosenCity}");
 
-    final citiesAsync = ref.read(citiesNotifierProvider);
+    final citiesAsync = ref.read(cityDataProvider);
 
     citiesAsync.whenData((cities) {
       final chosenCityData = cities.firstWhere(
@@ -296,7 +296,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
         _mapController.move(LatLng(lat, lng), _currentZoom);
       } else {
-        final restaurantsAsync = ref.read(restaurantsNotifierProvider);
+        final restaurantsAsync = ref.read(restaurantDataProvider);
         restaurantsAsync.whenData((restaurants) {
           final cityRestaurants = restaurants
               .where((r) =>
@@ -462,7 +462,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       sourceRestaurants = _allLoadedRestaurants;
     } else {
       // Fall back to provider (only on initial load)
-      final restaurantsAsync = ref.watch(restaurantsNotifierProvider);
+      final restaurantsAsync = ref.watch(restaurantDataProvider);
 
       return restaurantsAsync.when(
         data: (restaurants) {
@@ -487,7 +487,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () {
-                  ref.refresh(restaurantsNotifierProvider);
+                  ref.refresh(restaurantDataProvider);
                   _loadAllRestaurants(forceRefresh: true);
                 },
                 child: const Text('Try Again'),
@@ -499,7 +499,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
     }
 
     // Use the citiesProvider for city clusters
-    final citiesAsync = ref.watch(citiesNotifierProvider);
+    final citiesAsync = ref.watch(cityDataProvider);
 
     return citiesAsync.when(
       data: (cities) {
@@ -520,7 +520,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref.refresh(citiesNotifierProvider);
+                ref.refresh(cityDataProvider);
                 _loadAllRestaurants(forceRefresh: true);
               },
               child: const Text('Try Again'),
@@ -923,7 +923,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       );
 
       // Get cities data
-      final citiesAsync = ref.read(citiesNotifierProvider);
+      final citiesAsync = ref.read(cityDataProvider);
       final cities = await citiesAsync.when(
         data: (data) => Future.value(data),
         loading: () => throw Exception('Cities data is still loading'),

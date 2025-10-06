@@ -145,7 +145,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
     });
 
     try {
-      final dealsNotifier = ref.read(dealsNotifierProvider.notifier);
+      final dealsNotifier = ref.read(dealsDataProvider.notifier);
       final restaurantId = widget.restaurant['id']?.toString();
 
       if (restaurantId != null) {

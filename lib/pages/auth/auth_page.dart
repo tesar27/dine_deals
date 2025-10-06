@@ -27,7 +27,7 @@ class _AuthPageState extends State<AuthPage> {
   bool _isLoading = true;
   bool _isSent = false;
   String? _errorMessage;
-  
+
   late final TextEditingController _emailController = TextEditingController();
   late final TextEditingController _otpController = TextEditingController();
   late final TextEditingController _passwordController =

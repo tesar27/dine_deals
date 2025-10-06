@@ -10,7 +10,7 @@ class AdminPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final restaurantsAsync = ref.watch(restaurantsNotifierProvider);
+    final restaurantsAsync = ref.watch(restaurantDataProvider);
     // Local state for filters
     final nameController = TextEditingController();
     final cityController = TextEditingController();
@@ -25,7 +25,7 @@ class AdminPage extends ConsumerWidget {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               // Force refresh the restaurants list
-              ref.invalidate(restaurantsNotifierProvider);
+              ref.invalidate(restaurantDataProvider);
             },
           ),
         ],
@@ -50,7 +50,7 @@ class AdminPage extends ConsumerWidget {
                         onPressed: () async {
                           // Get filtered results
                           final filtered = await ref
-                              .read(restaurantsNotifierProvider.notifier)
+                              .read(restaurantDataProvider.notifier)
                               .getFilteredRestaurants(
                                 name: nameController.text,
                                 city: cityController.text,
@@ -63,7 +63,7 @@ class AdminPage extends ConsumerWidget {
 
                           // Update the provider state with filtered results
                           ref
-                              .read(restaurantsNotifierProvider.notifier)
+                              .read(restaurantDataProvider.notifier)
                               .updateFilteredResults(filteredList);
                         },
                       ),
@@ -180,7 +180,7 @@ class AdminPage extends ConsumerWidget {
                                   ),
                                 ).then((_) {
                                   // Refresh the list when returning from edit page
-                                  ref.invalidate(restaurantsNotifierProvider);
+                                  ref.invalidate(restaurantDataProvider);
                                 });
                               },
                               child: Column(
@@ -292,17 +292,17 @@ class AdminPage extends ConsumerWidget {
 
       // Upload the image using the provider
       final String? newImageUrl = await ref
-          .read(restaurantsNotifierProvider.notifier)
+          .read(restaurantDataProvider.notifier)
           .uploadImage(file, restaurantId: restaurant['id']);
 
       if (newImageUrl != null && context.mounted) {
         // Update the restaurant with new image URL
         await ref
-            .read(restaurantsNotifierProvider.notifier)
+            .read(restaurantDataProvider.notifier)
             .updateRestaurantImage(restaurant['id'], newImageUrl);
 
         // Refresh the list
-        ref.invalidate(restaurantsNotifierProvider);
+        ref.invalidate(restaurantDataProvider);
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -362,7 +362,7 @@ class AdminPage extends ConsumerWidget {
                     debugPrint('Checking if place exists: $name, $address');
                     // Check if restaurant with same name and address already exists
                     final exists = await ref
-                        .read(restaurantsNotifierProvider.notifier)
+                        .read(restaurantDataProvider.notifier)
                         .checkPlaceExists(name: name, address: address);
 
                     if (exists) {
@@ -383,19 +383,19 @@ class AdminPage extends ConsumerWidget {
 
                     debugPrint('Adding new place: $name, $address');
                     await ref
-                        .read(restaurantsNotifierProvider.notifier)
+                        .read(restaurantDataProvider.notifier)
                         .addPlace(
                           name: name,
                           address: address,
                         );
 
                     // Directly invalidate the provider to force a refresh
-                    ref.invalidate(restaurantsNotifierProvider);
+                    ref.invalidate(restaurantDataProvider);
 
                     // Also try direct fetch to ensure we get new data
                     await Future.delayed(const Duration(milliseconds: 300));
                     await ref
-                        .read(restaurantsNotifierProvider.notifier)
+                        .read(restaurantDataProvider.notifier)
                         .fetchRestaurants();
 
                     debugPrint('Place added and data refreshed');

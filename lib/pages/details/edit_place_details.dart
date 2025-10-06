@@ -60,7 +60,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
     });
 
     try {
-      final dealsNotifier = ref.read(dealsNotifierProvider.notifier);
+      final dealsNotifier = ref.read(dealsDataProvider.notifier);
       final restaurantId = widget.restaurant['id']?.toString();
 
       if (restaurantId != null) {
@@ -197,7 +197,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
                         if (formKey.currentState?.validate() ?? false) {
                           try {
                             final dealsNotifier =
-                                ref.read(dealsNotifierProvider.notifier);
+                                ref.read(dealsDataProvider.notifier);
 
                             await dealsNotifier.addDeal(
                               restaurantId: widget.restaurant['id'].toString(),
@@ -303,7 +303,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
       });
 
       // Refresh restaurants in provider
-      ref.invalidate(restaurantsNotifierProvider);
+      ref.invalidate(restaurantDataProvider);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -365,7 +365,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
       });
 
       // Force refresh restaurants provider
-      ref.invalidate(restaurantsNotifierProvider);
+      ref.invalidate(restaurantDataProvider);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -429,13 +429,13 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
 
       // Force refresh the restaurants provider
       final restaurantsNotifier =
-          ref.read(restaurantsNotifierProvider.notifier);
+          ref.read(restaurantDataProvider.notifier);
 
       // Force a refresh by explicitly fetching with forceRefresh: true
       await restaurantsNotifier.fetchRestaurants(forceRefresh: true);
 
       // Make sure the provider is invalidated to trigger rebuild of UI
-      ref.invalidate(restaurantsNotifierProvider);
+      ref.invalidate(restaurantDataProvider);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -917,7 +917,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
                     if (confirmed && deal['id'] != null) {
                       try {
                         final dealsNotifier =
-                            ref.read(dealsNotifierProvider.notifier);
+                            ref.read(dealsDataProvider.notifier);
                         await dealsNotifier.deleteDeal(deal['id'].toString());
 
                         ScaffoldMessenger.of(context).showSnackBar(

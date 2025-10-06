@@ -6,7 +6,7 @@ part of 'app_data_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$restaurantDataHash() => r'cd68b3879091c3b3dcff5bb200ecb85cb5bd735f';
+String _$restaurantDataHash() => r'4162db74c6c95ca54987fc6e9ee68bc62f8513e0';
 
 /// See also [RestaurantData].
 @ProviderFor(RestaurantData)
