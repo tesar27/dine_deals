@@ -2,6 +2,7 @@ import 'package:dine_deals/pages/details/edit_place_details.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dine_deals/providers/app_data_provider.dart';
+import 'package:dine_deals/models/deal_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/providers/user_provider.dart';
@@ -17,7 +18,7 @@ class PlaceDetails extends ConsumerStatefulWidget {
 
 class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
   bool _isLoading = true;
-  List<Map<String, dynamic>> _deals = [];
+  List<Deal> _deals = [];
   bool _isFavorite = false;
   bool _isSuperAdmin = false;
 
@@ -149,11 +150,11 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
       final restaurantId = widget.restaurant['id']?.toString();
 
       if (restaurantId != null) {
-        final deals = await dealsNotifier.getDealsForRestaurant(restaurantId);
-        setState(() {
-          _deals = deals;
-          _isLoading = false;
-        });
+          final deals = await dealsNotifier.getDealsForRestaurantTyped(restaurantId);
+          setState(() {
+            _deals = deals;
+            _isLoading = false;
+          });
       } else {
         setState(() {
           _isLoading = false;
@@ -574,14 +575,14 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
           margin: const EdgeInsets.all(8.0),
           child: ListTile(
             leading: const Icon(Icons.local_offer, color: Colors.green),
-            title: Text(deal['name'] ?? 'Special Offer'),
+            title: Text(deal.title),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(deal['description'] ?? 'No description available'),
+                Text(deal.description ?? 'No description available'),
                 const SizedBox(height: 4),
                 Text(
-                  'Save ${deal['savings']?.toString() ?? '0'} CHF',
+                  'Save ${deal.discountPercentage?.toString() ?? '0'} CHF',
                   style: const TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,

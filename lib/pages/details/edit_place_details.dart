@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dine_deals/providers/app_data_provider.dart';
+import 'package:dine_deals/models/deal_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
@@ -18,7 +19,7 @@ class EditPlaceDetails extends ConsumerStatefulWidget {
 class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
   bool _isLoading = true;
   bool _isEditMode = false;
-  List<Map<String, dynamic>> _deals = [];
+  List<Deal> _deals = [];
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _addressController;
@@ -63,11 +64,11 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
       final restaurantId = widget.restaurant['id']?.toString();
 
       if (restaurantId != null) {
-        final deals = await dealsNotifier.getDealsForRestaurant(restaurantId);
-        setState(() {
-          _deals = deals;
-          _isLoading = false;
-        });
+          final deals = await dealsNotifier.getDealsForRestaurantTyped(restaurantId);
+          setState(() {
+            _deals = deals;
+            _isLoading = false;
+          });
       } else {
         setState(() {
           _isLoading = false;
@@ -857,14 +858,14 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
           margin: const EdgeInsets.all(8.0),
           child: ListTile(
             leading: const Icon(Icons.local_offer, color: Colors.green),
-            title: Text(deal['name'] ?? 'Special Offer'),
+            title: Text(deal.title),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(deal['description'] ?? 'No description available'),
+                Text(deal.description ?? 'No description available'),
                 const SizedBox(height: 4),
                 Text(
-                  'Save ${deal['savings']?.toString() ?? '0'} CHF',
+                  'Save ${deal.discountPercentage?.toString() ?? '0'} CHF',
                   style: const TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,
@@ -913,11 +914,11 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
                         ) ??
                         false;
 
-                    if (confirmed && deal['id'] != null) {
+                    if (confirmed) {
                       try {
                         final dealsNotifier =
                             ref.read(dealsDataProvider.notifier);
-                        await dealsNotifier.deleteDeal(deal['id'].toString());
+                        await dealsNotifier.deleteDeal(deal.id);
 
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
