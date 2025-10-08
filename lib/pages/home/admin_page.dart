@@ -112,13 +112,9 @@ class AdminPage extends ConsumerWidget {
               : ListView.builder(
                   itemCount: restaurants.length,
                   itemBuilder: (context, index) {
-                    final item = restaurants[index];
-          final restaurant = item is Restaurant
-            ? item as Restaurant
-            : Restaurant.fromMap(item as Map<String, dynamic>);
-                    final offers = (item is Map<String, dynamic>)
-                        ? (item['offers'] as List? ?? [])
-                        : <String>[];
+                    final Map<String, dynamic> item = restaurants[index];
+                    final restaurant = Restaurant.fromMap(item);
+                    final offers = (item['offers'] as List?)?.cast<String>() ?? <String>[];
                     return Padding(
                       padding: const EdgeInsets.symmetric(
                           vertical: 8.0, horizontal: 16.0),
@@ -156,7 +152,7 @@ class AdminPage extends ConsumerWidget {
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.6),
+                                    color: Colors.black.withAlpha((0.6 * 255).round()),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -206,10 +202,8 @@ class AdminPage extends ConsumerWidget {
                     Text(' ${restaurant.rating?.toStringAsFixed(1) ?? '4.5'} · '),
                                       const Icon(Icons.location_on,
                                           size: 16, color: Colors.grey),
-                    Text(
-                      ' ${(item is Map<String, dynamic> && item['distance'] != null) ? item['distance'].toString() : '1.2 km'} · '),
-                    Text(
-                      (item is Map<String, dynamic>) ? (item['category'] ?? 'Restaurant') : (restaurant.categories != null && restaurant.categories!.isNotEmpty ? restaurant.categories!.first : 'Restaurant'),
+                    Text(' ${(item['distance'] != null) ? item['distance'].toString() : '1.2 km'} · '),
+                    Text((item['category'] ?? 'Restaurant') as String,
                                           style: TextStyle(
                                               color: Colors.grey[600])),
                                     ],

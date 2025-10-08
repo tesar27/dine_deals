@@ -321,27 +321,30 @@ class _AuthPageState extends State<AuthPage> {
       );
     }
 
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: EdgeInsets.all(screenWidth * 0.06),
           child: Center(
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Logo or App Name
-                  Icon(Icons.restaurant, size: 80, color: colorScheme.primary),
-                  const SizedBox(height: 12),
+                  Icon(Icons.restaurant, size: screenHeight * 0.08, color: colorScheme.primary),
+                  SizedBox(height: screenHeight * 0.015),
                   Text(
                     'Dine Deals',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: screenWidth * 0.075,
                       fontWeight: FontWeight.bold,
                       color: colorScheme.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  SizedBox(height: screenHeight * 0.04),
 
                   // Auth mode selector tabs
                   Container(
@@ -407,7 +410,7 @@ class _AuthPageState extends State<AuthPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 32),
+                  SizedBox(height: screenHeight * 0.03),
 
                         // Main form fields
                         if (_errorMessage != null)
@@ -426,7 +429,7 @@ class _AuthPageState extends State<AuthPage> {
                         BoxShadow(
                           color: isDarkMode
                               ? Colors.black26
-                              : Colors.grey.withOpacity(0.2),
+                              : Colors.grey.withAlpha((0.2 * 255).round()),
                           spreadRadius: 2,
                           blurRadius: 7,
                           offset: const Offset(0, 3),
@@ -595,7 +598,7 @@ class _AuthPageState extends State<AuthPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 28),
+                  SizedBox(height: screenHeight * 0.025),
 
                   // OR Divider
                   Row(
@@ -616,7 +619,7 @@ class _AuthPageState extends State<AuthPage> {
                     ],
                   ),
 
-                  const SizedBox(height: 24),
+                  SizedBox(height: screenHeight * 0.02),
 
                   // Replace social login buttons with Continue as Guest
                   ElevatedButton(
