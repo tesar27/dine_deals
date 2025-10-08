@@ -546,8 +546,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       final dealsNotifier = ref.read(dealsDataProvider.notifier);
       List<Map<String, dynamic>> restaurantsWithDeals = [];
 
-      for (var restaurant
-          in results is List ? results.cast<Map<String, dynamic>>() : []) {
+    for (final restaurant in results) {
         try {
           final restaurantId = restaurant['id']?.toString();
           if (restaurantId != null) {
@@ -622,42 +621,32 @@ class _DealsPageState extends ConsumerState<DealsPage> {
   }
 
   // Add a method to find the nearest city from user location
-  Future<void> _findNearestCity(Position position) async {
-    if (!mounted || _isDisposed) return;
+  Future<void> _findNearestCity(Position? position) async {
+    if (position == null || !mounted || _isDisposed) return;
 
     setState(() {
       _isLoadingRestaurants = true;
     });
 
     try {
-      final citiesAsync = ref.read(cityDataProvider);
+      // Fetch the full city records (with coordinates) from the notifier helper
+      final cities = await ref.read(cityDataProvider.notifier).fetchCityRecords();
 
-      final cities = await citiesAsync.when(
-        data: (data) => Future.value(data),
-        loading: () => throw Exception('Cities data is still loading'),
-        error: (error, stack) =>
-            throw Exception('Error loading cities: $error'),
-      );
-
-      // Check if still mounted before continuing
       if (!mounted || _isDisposed) return;
+      if (cities.isEmpty) throw Exception('No cities available');
 
-      if (cities.isEmpty) {
-        throw Exception('No cities available');
-      }
-
-      // Find the nearest city by calculating distance
       double nearestDistance = double.infinity;
-      Map<String, dynamic> nearestCity = cities.first;
+      Map<String, dynamic>? nearestCity;
 
       for (final city in cities) {
-        if (city['latitude'] == null || city['longitude'] == null) continue;
+        final latVal = city['latitude'];
+        final lngVal = city['longitude'];
+        if (latVal == null || lngVal == null) continue;
 
-        // Parse city coordinates
-        final cityLat = double.parse(city['latitude'].toString());
-        final cityLng = double.parse(city['longitude'].toString());
+        final cityLat = double.tryParse(latVal.toString());
+        final cityLng = double.tryParse(lngVal.toString());
+        if (cityLat == null || cityLng == null) continue;
 
-        // Calculate distance using the Distance class from latlong2 package
         final distance = const Distance().as(
           LengthUnit.Kilometer,
           LatLng(position.latitude, position.longitude),
@@ -670,18 +659,18 @@ class _DealsPageState extends ConsumerState<DealsPage> {
         }
       }
 
-      // Check if still mounted before updating state
-      if (!mounted || _isDisposed) return;
+      if (nearestCity == null) {
+        throw Exception('No suitable nearest city found');
+      }
 
-      // Update the chosen city using the provider
-      final cityName = nearestCity['name'] as String;
+      final cityName = nearestCity['name'] as String?;
+      if (cityName == null) throw Exception('Nearest city missing name');
       ref.read(chosenCityProvider.notifier).updateCity(cityName);
 
       setState(() {
         _isLoadingRestaurants = false;
       });
 
-      // Fetch restaurants with the new city
       _fetchFilteredRestaurants();
 
       if (mounted && !_isDisposed) {
@@ -768,9 +757,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                     _iconTapped = false;
                   });
                   citiesAsync.when(
-                    data: (cities) => _showCitiesList(
-                      cities.map((city) => city['name'] as String).toList(),
-                    ),
+                    data: (cities) => _showCitiesList(cities),
                     loading: () => ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Loading cities...')),
                     ),
@@ -1159,25 +1146,5 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     return parts.isNotEmpty ? parts[0].trim() : address;
   }
 
-  // Helper method to get categories as a list
-  List<String> _getCategoriesAsList(Map<String, dynamic> restaurant) {
-    // Try to get categories from restaurant data
-    final categories = restaurant['categories'];
-
-    if (categories == null) {
-      // No categories, return default
-      return ['Restaurant'];
-    } else if (categories is String) {
-      // If it's a string, split by commas or return as single item
-      return categories.contains(',')
-          ? categories.split(',').map((e) => e.trim()).toList()
-          : [categories];
-    } else if (categories is List) {
-      // If it's already a list, convert all items to strings
-      return categories.map((e) => e.toString()).toList();
-    }
-
-    // Fallback case
-    return ['Restaurant'];
-  }
+  // ...existing code...
 }

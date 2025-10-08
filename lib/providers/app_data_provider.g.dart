@@ -6,7 +6,7 @@ part of 'app_data_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$restaurantDataHash() => r'4162db74c6c95ca54987fc6e9ee68bc62f8513e0';
+String _$restaurantDataHash() => r'9978d083007838682a460660981264ed5359f294';
 
 /// See also [RestaurantData].
 @ProviderFor(RestaurantData)
@@ -22,7 +22,7 @@ final restaurantDataProvider = AutoDisposeAsyncNotifierProvider<RestaurantData,
 );
 
 typedef _$RestaurantData = AutoDisposeAsyncNotifier<List<Map<String, dynamic>>>;
-String _$cityDataHash() => r'db4058008a574deb427dcbbdaa83d42e4924af7e';
+String _$cityDataHash() => r'e9398a7a60b789e518549a64a7a5fb4850b826b2';
 
 /// See also [CityData].
 @ProviderFor(CityData)
@@ -37,7 +37,7 @@ final cityDataProvider =
 );
 
 typedef _$CityData = AutoDisposeAsyncNotifier<List<String>>;
-String _$dealsDataHash() => r'1016d35c5bc820aa324a2648a14598f2a745371c';
+String _$dealsDataHash() => r'b6cfa3e89ed91d3082e505bec81f7ea4e15956b6';
 
 /// See also [DealsData].
 @ProviderFor(DealsData)

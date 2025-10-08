@@ -8,7 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/main.dart';
 import 'package:dine_deals/pages/auth/profile_setup_page.dart';
 import 'package:dine_deals/pages/home/home_page.dart';
-import 'package:dine_deals/widgets/app_components.dart';
+// Removed unused import
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -409,7 +409,15 @@ class _AuthPageState extends State<AuthPage> {
 
                   const SizedBox(height: 32),
 
-                  // Main form fields
+                        // Main form fields
+                        if (_errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12.0),
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
                   Container(
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,

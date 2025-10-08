@@ -38,7 +38,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   @override
   void initState() {
     super.initState();
-    if (isUserSignedIn()) {
+    if (isUserSignedIn) {
       _initializeProfile();
     }
   }
@@ -92,7 +92,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   Widget build(BuildContext context) {
     final userAsync = ref.watch(userNotifierProvider);
     final themeMode = ref.watch(themeModeProvider);
-    final isSignedIn = isUserSignedIn();
+  final isSignedIn = isUserSignedIn;
 
     return Scaffold(
       body: SafeArea(

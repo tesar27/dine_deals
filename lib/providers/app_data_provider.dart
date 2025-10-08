@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:dine_deals/config/config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:dine_deals/models/restaurant_model.dart';
+import 'package:dine_deals/models/deal_model.dart';
+import 'package:dine_deals/models/city_model.dart';
 
 part 'app_data_provider.g.dart';
 
@@ -81,6 +85,12 @@ class RestaurantData extends _$RestaurantData {
     }
   }
 
+  /// Return typed Restaurant objects mapped from the cached/fresh maps.
+  Future<List<Restaurant>> fetchRestaurantsTyped({bool forceRefresh = false}) async {
+    final maps = await fetchRestaurants(forceRefresh: forceRefresh);
+    return maps.map((m) => Restaurant.fromMap(m)).toList();
+  }
+
   Future<void> addRestaurant({
     required String name,
     required String address,
@@ -140,25 +150,85 @@ class RestaurantData extends _$RestaurantData {
     }
   }
 
-  List<Map<String, dynamic>> getFilteredRestaurants(String query) {
-    final current = state.value ?? [];
-    if (query.isEmpty) return current;
-    return current.where((restaurant) {
-      final name = restaurant['name']?.toString().toLowerCase() ?? '';
-      final address = restaurant['address']?.toString().toLowerCase() ?? '';
-      final searchQuery = query.toLowerCase();
-      return name.contains(searchQuery) || address.contains(searchQuery);
-    }).toList();
+  
+
+  /// Returns a list of restaurants filtered by optional named parameters.
+  /// Supports filtering by name, city, country or category. If no filters are
+  /// provided, returns all restaurants.
+  Future<List<Map<String, dynamic>>> getFilteredRestaurants({
+    String? name,
+    String? city,
+    String? country,
+    String? category,
+  }) async {
+    final all = await fetchRestaurants();
+
+    Iterable<Map<String, dynamic>> results = all;
+
+    if (name != null && name.isNotEmpty) {
+      final q = name.toLowerCase();
+      results = results.where((r) {
+        final n = r['name']?.toString().toLowerCase() ?? '';
+        final a = r['address']?.toString().toLowerCase() ?? '';
+        return n.contains(q) || a.contains(q);
+      });
+    }
+
+    if (city != null && city.isNotEmpty) {
+      final c = city.toLowerCase();
+      results = results.where((r) {
+        final addr = r['address']?.toString().toLowerCase() ?? '';
+        final cityField = r['city']?.toString().toLowerCase() ?? '';
+        return addr.contains(c) || cityField.contains(c);
+      });
+    }
+
+    if (country != null && country.isNotEmpty) {
+      final c = country.toLowerCase();
+      results = results.where((r) {
+        final countryField = r['country']?.toString().toLowerCase() ?? '';
+        return countryField.contains(c);
+      });
+    }
+
+    if (category != null && category.isNotEmpty) {
+      final cat = category.toLowerCase();
+      results = results.where((r) {
+        final categories = r['categories'];
+        if (categories == null) return false;
+        if (categories is String) {
+          return categories.toLowerCase().contains(cat);
+        }
+        if (categories is List) {
+          return categories.map((e) => e.toString().toLowerCase()).contains(cat);
+        }
+        return false;
+      });
+    }
+
+    return results.toList();
   }
 
-  void updateFilteredResults(String query) {
-    // This method triggers a rebuild with filtered results
+  void updateFilteredResults(dynamic _filtered) {
+    // Accept either a search query or a pre-filtered list and trigger a refresh
     ref.invalidateSelf();
   }
 
-  Future<void> uploadImage(String imagePath) async {
-    // Placeholder for image upload functionality
-    throw UnimplementedError('Image upload not implemented yet');
+  Future<String?> uploadImage(File file, {required dynamic restaurantId}) async {
+    try {
+      final bucket = 'pictures';
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split(Platform.pathSeparator).last}';
+
+      final storage = Supabase.instance.client.storage;
+      await storage.from(bucket).upload(fileName, file,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: true));
+
+      final publicUrl = storage.from(bucket).getPublicUrl(fileName);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      return null;
+    }
   }
 
   Future<void> updateRestaurantImage(int restaurantId, String imageUrl) async {
@@ -166,21 +236,41 @@ class RestaurantData extends _$RestaurantData {
     throw UnimplementedError('Restaurant image update not implemented yet');
   }
 
-  Future<bool> checkPlaceExists(String name) async {
+  Future<bool> checkPlaceExists({required String name, String? address}) async {
     try {
+  final filters = <String, Object>{'name': name};
+  if (address != null && address.isNotEmpty) filters['address'] = address;
       final data = await Supabase.instance.client
           .from('restaurants')
           .select('id')
-          .eq('name', name)
+          .match(filters)
           .limit(1);
-      return data.isNotEmpty;
+      final list = data as List<dynamic>;
+      return list.isNotEmpty;
     } catch (error) {
+      debugPrint('Error checking place exists: $error');
       return false;
     }
   }
 
   Future<void> addPlace({required String name, required String address}) async {
     await addRestaurant(name: name, address: address);
+  }
+
+  /// Typed helper to get filtered Restaurant model instances.
+  Future<List<Restaurant>> getFilteredRestaurantsTyped({
+    String? name,
+    String? city,
+    String? country,
+    String? category,
+  }) async {
+    final maps = await getFilteredRestaurants(
+      name: name,
+      city: city,
+      country: country,
+      category: category,
+    );
+    return maps.map((m) => Restaurant.fromMap(m)).toList();
   }
 
   Future<Map<String, double>> _getCoordinatesFromAddress(String address) async {
@@ -246,6 +336,35 @@ class CityData extends _$CityData {
     } catch (error) {
       throw Exception('Failed to fetch cities: $error');
     }
+  }
+
+  /// Fetch full city records (including latitude/longitude) for callers that
+  /// require geographic data. This is intentionally a separate API so the
+  /// generated provider continues to return a lightweight List<String>.
+  Future<List<Map<String, dynamic>>> fetchCityRecords() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('cities')
+          .select('id, name, latitude, longitude')
+          .order('name', ascending: true);
+      return (data as List<dynamic>)
+          .map((city) => {
+                'id': city['id'],
+                'name': city['name'],
+                'latitude': city['latitude'],
+                'longitude': city['longitude'],
+              })
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching city records: $e');
+      return [];
+    }
+  }
+
+  /// Typed helper returning City model instances for callers that need full city data
+  Future<List<City>> fetchCityRecordsTyped() async {
+    final maps = await fetchCityRecords();
+    return maps.map((m) => City.fromMap(m)).toList();
   }
 
   Future<String> getChosenCity() async {
@@ -325,19 +444,33 @@ class DealsData extends _$DealsData {
     }
   }
 
+  /// Typed helper to get Deal model instances from the cached/fresh data
+  Future<List<Deal>> fetchDealsTyped({bool forceRefresh = false}) async {
+    final maps = await fetchDeals(forceRefresh: forceRefresh);
+    return maps.map((m) => Deal.fromMap(m)).toList();
+  }
+
   Future<void> addDeal({
-    required String title,
+    String? title,
+    String? name,
     required String description,
-    required int restaurantId,
-    required double discountPercentage,
+    required dynamic restaurantId,
+    double? discountPercentage,
+    double? savings,
     DateTime? validUntil,
   }) async {
     try {
+      final resolvedTitle = title ?? name ?? 'Special Offer';
+      final resolvedRestaurantId = restaurantId is String
+          ? int.tryParse(restaurantId) ?? 0
+          : (restaurantId as int);
+      final resolvedDiscount = discountPercentage ?? (savings ?? 0.0);
+
       await Supabase.instance.client.from('deals').insert({
-        'title': title,
+        'title': resolvedTitle,
         'description': description,
-        'restaurant_id': restaurantId,
-        'discount_percentage': discountPercentage,
+        'restaurant_id': resolvedRestaurantId,
+        'discount_percentage': resolvedDiscount,
         'valid_until': validUntil?.toIso8601String(),
         'is_active': true,
       });
@@ -349,14 +482,29 @@ class DealsData extends _$DealsData {
     }
   }
 
-  List<Map<String, dynamic>> getDealsForRestaurant(int restaurantId) {
+  Future<List<Map<String, dynamic>>> getDealsForRestaurant(dynamic restaurantId) async {
     final current = state.value ?? [];
-    return current.where((deal) => deal['restaurant_id'] == restaurantId).toList();
+    int id;
+    if (restaurantId is String) {
+      id = int.tryParse(restaurantId) ?? -1;
+    } else if (restaurantId is int) {
+      id = restaurantId;
+    } else {
+      id = -1;
+    }
+    return current.where((deal) => deal['restaurant_id'] == id).toList().cast<Map<String, dynamic>>();
   }
 
-  Future<void> deleteDeal(int dealId) async {
+  /// Typed version of getDealsForRestaurant
+  Future<List<Deal>> getDealsForRestaurantTyped(dynamic restaurantId) async {
+    final maps = await getDealsForRestaurant(restaurantId);
+    return maps.map((m) => Deal.fromMap(m)).toList();
+  }
+
+  Future<void> deleteDeal(dynamic dealId) async {
     try {
-      await Supabase.instance.client.from('deals').delete().eq('id', dealId);
+      final id = dealId is String ? int.tryParse(dealId) ?? -1 : (dealId as int);
+      await Supabase.instance.client.from('deals').delete().eq('id', id);
       await fetchDeals(forceRefresh: true);
       ref.invalidateSelf();
     } catch (error) {
@@ -371,3 +519,10 @@ class DealsData extends _$DealsData {
 
 // Simple StateProvider for chosen city
 final chosenCityProvider = StateProvider<String>((ref) => 'Choose your city');
+
+// Provide a convenience extension so UI code can call
+// ref.read(chosenCityProvider.notifier).updateCity('City')
+// without needing to change all call sites.
+extension ChosenCityControllerExt on StateController<String> {
+  void updateCity(String city) => state = city;
+}

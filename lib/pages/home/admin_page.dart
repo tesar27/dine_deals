@@ -49,17 +49,13 @@ class AdminPage extends ConsumerWidget {
                         icon: const Icon(Icons.search),
                         onPressed: () async {
                           // Get filtered results
-                          final filtered = await ref
+                          final filteredList = await ref
                               .read(restaurantDataProvider.notifier)
                               .getFilteredRestaurants(
                                 name: nameController.text,
                                 city: cityController.text,
                                 country: countryController.text,
                               );
-                          // Convert to List if it's a single item
-                          final filteredList = filtered is Map
-                              ? [filtered as Map<String, dynamic>]
-                              : filtered as List<Map<String, dynamic>>;
 
                           // Update the provider state with filtered results
                           ref

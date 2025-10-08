@@ -24,6 +24,7 @@ class _SignupPageState extends State<SignupPage> {
       TextEditingController();
   late final StreamSubscription<AuthState> _authStateSubscription;
 
+  // ignore: unused_element
   Future<void> _sendOTP() async {
     try {
       setState(() {
@@ -55,15 +56,16 @@ class _SignupPageState extends State<SignupPage> {
   }
 
 //tesar.public@gmail.com
+  // ignore: unused_element
   Future<void> _verifyOTPAndSignIn(String otp) async {
     try {
       setState(() {
         _isLoading = true;
       });
-      final response = await supabase.auth.verifyOTP(
-          email: _emailController.text.trim(),
-          token: _otpController.text.trim(),
-          type: OtpType.signup);
+    await supabase.auth.verifyOTP(
+      email: _emailController.text.trim(),
+      token: _otpController.text.trim(),
+      type: OtpType.signup);
     } on AuthException catch (error) {
       if (mounted) context.showSnackBar(error.message, isError: true);
     } catch (error) {
@@ -85,8 +87,8 @@ class _SignupPageState extends State<SignupPage> {
       setState(() {
         _isLoading = true;
       });
-      final response = await supabase.auth
-          .signUp(email: email.trim(), password: password.trim());
+    await supabase.auth
+      .signUp(email: email.trim(), password: password.trim());
     } on AuthException catch (error) {
       if (mounted) context.showSnackBar(error.message, isError: true);
     } catch (error) {

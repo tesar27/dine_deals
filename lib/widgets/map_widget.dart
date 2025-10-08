@@ -1,11 +1,10 @@
-import 'package:dine_deals/widgets/map_bottom_controls.dart';
+// ...existing imports...
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:dine_deals/providers/restaurants_provider.dart';
-import 'package:dine_deals/providers/cities_provider.dart';
+import 'package:dine_deals/providers/app_data_provider.dart';
 
 class MapWidget extends ConsumerStatefulWidget {
   final Function(String)? onMarkerTapped;
@@ -39,7 +38,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
   // Track if all restaurants are loaded
   bool _allRestaurantsLoaded = false;
-  List<Map<String, dynamic>> _allRestaurants = [];
+  // NOTE: _allLoadedRestaurants is used to store the actual restaurant list
   Map<String, int> _restaurantCountByCity = {};
 
   // Add a flag to track if we're currently filtering restaurants
@@ -117,20 +116,11 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       });
 
       try {
-        // Step 1: Get cities data first
-        final citiesAsync = ref.read(cityDataProvider);
-        final cities = await citiesAsync.when(
-          data: (data) => Future.value(data),
-          loading: () => Future.delayed(
-            const Duration(seconds: 1),
-            () => throw Exception('Cities still loading'),
-          ),
-          error: (error, _) => throw Exception('Failed to load cities: $error'),
-        );
+        // Step 1: Get full city records (including lat/lng)
+        final cities = await ref.read(cityDataProvider.notifier).fetchCityRecords();
 
         // Step 2: Get restaurants data - use the passed forceRefresh parameter
-        final restaurantsNotifier =
-            ref.read(restaurantDataProvider.notifier);
+        final restaurantsNotifier = ref.read(restaurantDataProvider.notifier);
         final allRestaurantsData = await restaurantsNotifier.fetchRestaurants(
             forceRefresh: forceRefresh);
 
@@ -218,7 +208,6 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
         if (mounted) {
           setState(() {
-            _allRestaurants = allRestaurantsData;
             _restaurantCountByCity = countByCity;
             _allRestaurantsLoaded = true;
             _isFiltering = false;
@@ -273,70 +262,45 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
     return parts.isNotEmpty ? parts[0].trim() : '';
   }
 
-  void _centerOnChosenCity() async {
+  Future<void> _centerOnChosenCity() async {
     if (widget.chosenCity == 'Choose your city') return;
 
     print("Centering on city: ${widget.chosenCity}");
 
-    final citiesAsync = ref.read(cityDataProvider);
+    final cities = await ref.read(cityDataProvider.notifier).fetchCityRecords();
+    final chosenCityData = cities.firstWhere(
+      (city) => city['name'] == widget.chosenCity,
+      orElse: () => {'name': widget.chosenCity, 'latitude': null, 'longitude': null},
+    );
 
-    citiesAsync.whenData((cities) {
-      final chosenCityData = cities.firstWhere(
-        (city) => city['name'] == widget.chosenCity,
-        orElse: () =>
-            {'name': widget.chosenCity, 'latitude': null, 'longitude': null},
-      );
+    if (chosenCityData['latitude'] != null && chosenCityData['longitude'] != null) {
+      final lat = double.parse(chosenCityData['latitude'].toString());
+      final lng = double.parse(chosenCityData['longitude'].toString());
 
-      if (chosenCityData['latitude'] != null &&
-          chosenCityData['longitude'] != null) {
-        final lat = double.parse(chosenCityData['latitude'].toString());
-        final lng = double.parse(chosenCityData['longitude'].toString());
+      print("Moving map to coordinates: $lat, $lng");
 
-        print("Moving map to coordinates: $lat, $lng");
+      _mapController.move(LatLng(lat, lng), _currentZoom);
+    } else {
+      final restaurantsAsync = ref.read(restaurantDataProvider);
+      restaurantsAsync.whenData((restaurants) {
+        final cityRestaurants = restaurants
+            .where((r) =>
+                r['address'] != null && r['address'].toString().contains(widget.chosenCity))
+            .toList();
 
-        _mapController.move(LatLng(lat, lng), _currentZoom);
-      } else {
-        final restaurantsAsync = ref.read(restaurantDataProvider);
-        restaurantsAsync.whenData((restaurants) {
-          final cityRestaurants = restaurants
-              .where((r) =>
-                  r['address'] != null &&
-                  r['address'].toString().contains(widget.chosenCity))
-              .toList();
+        if (cityRestaurants.isNotEmpty && cityRestaurants[0]['latitude'] != null && cityRestaurants[0]['longitude'] != null) {
+          final lat = double.parse(cityRestaurants[0]['latitude'].toString());
+          final lng = double.parse(cityRestaurants[0]['longitude'].toString());
 
-          if (cityRestaurants.isNotEmpty &&
-              cityRestaurants[0]['latitude'] != null &&
-              cityRestaurants[0]['longitude'] != null) {
-            final lat = double.parse(cityRestaurants[0]['latitude'].toString());
-            final lng =
-                double.parse(cityRestaurants[0]['longitude'].toString());
+          print("Moving map to restaurant coordinates: $lat, $lng");
 
-            print("Moving map to restaurant coordinates: $lat, $lng");
-
-            _mapController.move(LatLng(lat, lng), _currentZoom);
-          }
-        });
-      }
-    });
+          _mapController.move(LatLng(lat, lng), _currentZoom);
+        }
+      });
+    }
   }
 
-  void _centerOnDefault() {
-    _mapController.move(const LatLng(zurichLat, zurichLng), _currentZoom);
-  }
-
-  void _zoomIn() {
-    setState(() {
-      _currentZoom += 1;
-      _mapController.move(_mapController.camera.center, _currentZoom);
-    });
-  }
-
-  void _zoomOut() {
-    setState(() {
-      _currentZoom -= 1;
-      _mapController.move(_mapController.camera.center, _currentZoom);
-    });
-  }
+  // ...existing code...
 
   // Add this helper function inside _MapWidgetState
   String _normalizeCityName(String city) {
@@ -487,7 +451,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () {
-                  ref.refresh(restaurantDataProvider);
+                  ref.invalidate(restaurantDataProvider);
                   _loadAllRestaurants(forceRefresh: true);
                 },
                 child: const Text('Try Again'),
@@ -520,7 +484,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref.refresh(cityDataProvider);
+                ref.invalidate(cityDataProvider);
                 _loadAllRestaurants(forceRefresh: true);
               },
               child: const Text('Try Again'),
@@ -668,10 +632,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                           lng = zurichLng;
                         }
 
-                        final String name =
-                            restaurant['name'] ?? 'Unnamed Restaurant';
-                        final String address =
-                            restaurant['address'] ?? 'No address';
+            // Use restaurant['name'] and restaurant['address'] inline when needed
 
                         return Marker(
                           width: 120.0,
@@ -922,13 +883,8 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         ),
       );
 
-      // Get cities data
-      final citiesAsync = ref.read(cityDataProvider);
-      final cities = await citiesAsync.when(
-        data: (data) => Future.value(data),
-        loading: () => throw Exception('Cities data is still loading'),
-        error: (error, _) => throw Exception('Error loading cities: $error'),
-      );
+      // Get full city records (with coordinates)
+      final cities = await ref.read(cityDataProvider.notifier).fetchCityRecords();
 
       if (!mounted) return;
 

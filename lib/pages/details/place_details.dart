@@ -1,7 +1,7 @@
 import 'package:dine_deals/pages/details/edit_place_details.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dine_deals/providers/deals_provider.dart';
+import 'package:dine_deals/providers/app_data_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/providers/user_provider.dart';
