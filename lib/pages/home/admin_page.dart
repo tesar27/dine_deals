@@ -4,6 +4,7 @@ import 'package:dine_deals/providers/app_data_provider.dart';
 import 'package:dine_deals/pages/details/edit_place_details.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:dine_deals/models/restaurant_model.dart';
 
 class AdminPage extends ConsumerWidget {
   const AdminPage({super.key});
@@ -111,7 +112,13 @@ class AdminPage extends ConsumerWidget {
               : ListView.builder(
                   itemCount: restaurants.length,
                   itemBuilder: (context, index) {
-                    final restaurant = restaurants[index];
+                    final item = restaurants[index];
+          final restaurant = item is Restaurant
+            ? item as Restaurant
+            : Restaurant.fromMap(item as Map<String, dynamic>);
+                    final offers = (item is Map<String, dynamic>)
+                        ? (item['offers'] as List? ?? [])
+                        : <String>[];
                     return Padding(
                       padding: const EdgeInsets.symmetric(
                           vertical: 8.0, horizontal: 16.0),
@@ -122,12 +129,12 @@ class AdminPage extends ConsumerWidget {
                           Stack(
                             children: [
                               GestureDetector(
-                                onTap: () => _pickAndUploadImage(
+                                  onTap: () => _pickAndUploadImage(
                                     context, ref, restaurant),
-                                child: ClipRRect(
+                                    child: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
                                   child: Image.network(
-                                    restaurant['imageUrl'] ??
+                                    restaurant.imageUrl ??
                                         'https://kpceyekfdauxsbljihst.supabase.co/storage/v1/object/public/pictures//cheeseburger-7580676_1280.jpg',
                                     width: 100,
                                     height: 100,
@@ -179,12 +186,12 @@ class AdminPage extends ConsumerWidget {
                                   ref.invalidate(restaurantDataProvider);
                                 });
                               },
-                              child: Column(
+                                  child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // First row - Restaurant name
                                   Text(
-                                    restaurant['name'],
+                                    restaurant.name,
                                     style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -196,15 +203,13 @@ class AdminPage extends ConsumerWidget {
                                     children: [
                                       const Icon(Icons.star,
                                           size: 16, color: Colors.amber),
-                                      Text(
-                                          ' ${restaurant['rating'] ?? '4.5'} · '),
+                    Text(' ${restaurant.rating?.toStringAsFixed(1) ?? '4.5'} · '),
                                       const Icon(Icons.location_on,
                                           size: 16, color: Colors.grey),
-                                      Text(
-                                          ' ${restaurant['distance'] ?? '1.2 km'} · '),
-                                      Text(
-                                          restaurant['category'] ??
-                                              'Restaurant',
+                    Text(
+                      ' ${(item is Map<String, dynamic> && item['distance'] != null) ? item['distance'].toString() : '1.2 km'} · '),
+                    Text(
+                      (item is Map<String, dynamic>) ? (item['category'] ?? 'Restaurant') : (restaurant.categories != null && restaurant.categories!.isNotEmpty ? restaurant.categories!.first : 'Restaurant'),
                                           style: TextStyle(
                                               color: Colors.grey[600])),
                                     ],
@@ -215,8 +220,7 @@ class AdminPage extends ConsumerWidget {
                                     spacing: 8,
                                     runSpacing: 8,
                                     children: [
-                                      for (var offer in restaurant['offers'] ??
-                                          ['2for1 Burger', 'FREE Soft Drink'])
+                                      for (var offer in offers.isNotEmpty ? offers : ['2for1 Burger', 'FREE Soft Drink'])
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 10, vertical: 4),
@@ -257,7 +261,7 @@ class AdminPage extends ConsumerWidget {
 
   // Method to handle image picking and uploading
   Future<void> _pickAndUploadImage(BuildContext context, WidgetRef ref,
-      Map<String, dynamic> restaurant) async {
+    Restaurant restaurant) async {
     final ImagePicker picker = ImagePicker();
 
     try {
@@ -287,15 +291,15 @@ class AdminPage extends ConsumerWidget {
       final File file = File(filePath);
 
       // Upload the image using the provider
-      final String? newImageUrl = await ref
-          .read(restaurantDataProvider.notifier)
-          .uploadImage(file, restaurantId: restaurant['id']);
+    final String? newImageUrl = await ref
+      .read(restaurantDataProvider.notifier)
+      .uploadImage(file, restaurantId: restaurant.id);
 
       if (newImageUrl != null && context.mounted) {
         // Update the restaurant with new image URL
-        await ref
-            .read(restaurantDataProvider.notifier)
-            .updateRestaurantImage(restaurant['id'], newImageUrl);
+    await ref
+      .read(restaurantDataProvider.notifier)
+      .updateRestaurantImage(restaurant.id, newImageUrl);
 
         // Refresh the list
         ref.invalidate(restaurantDataProvider);
