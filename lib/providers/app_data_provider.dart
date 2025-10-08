@@ -216,7 +216,7 @@ class RestaurantData extends _$RestaurantData {
 
   Future<String?> uploadImage(File file, {required dynamic restaurantId}) async {
     try {
-      final bucket = 'pictures';
+  const bucket = 'pictures';
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split(Platform.pathSeparator).last}';
 
       final storage = Supabase.instance.client.storage;

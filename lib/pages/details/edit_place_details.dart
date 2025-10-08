@@ -6,7 +6,7 @@ import 'package:dine_deals/models/restaurant_model.dart';
 import 'package:dine_deals/models/deal_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as path;
+// Removed package:path dependency — use inline extension handling
 
 class EditPlaceDetails extends ConsumerStatefulWidget {
   final Restaurant restaurant;
@@ -61,18 +61,11 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
     try {
       final dealsNotifier = ref.read(dealsDataProvider.notifier);
       final restaurantId = widget.restaurant.id;
-
-      if (restaurantId != null) {
-          final deals = await dealsNotifier.getDealsForRestaurantTyped(restaurantId);
-          setState(() {
-            _deals = deals;
-            _isLoading = false;
-          });
-      } else {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      final deals = await dealsNotifier.getDealsForRestaurantTyped(restaurantId);
+      setState(() {
+        _deals = deals;
+        _isLoading = false;
+      });
     } catch (error) {
       debugPrint("Error fetching deals: $error");
       setState(() {
@@ -249,14 +242,11 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
     });
 
     try {
-  final restaurantId = widget.restaurant.id.toString();
-      if (restaurantId == null) {
-        throw Exception('Restaurant ID not found');
-      }
+      final restaurantId = widget.restaurant.id;
 
       // Upload to Supabase Storage
-      final fileExt = path.extension(image.path);
-      final fileName = 'restaurant_$restaurantId$fileExt';
+      final fileExt = image.path.contains('.') ? image.path.substring(image.path.lastIndexOf('.')) : '';
+      final fileName = 'restaurant_${restaurantId.toString()}$fileExt';
       final file = File(image.path);
 
       // Debug output
@@ -333,10 +323,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
     });
 
     try {
-  final restaurantId = widget.restaurant.id.toString();
-      if (restaurantId == null) {
-        throw Exception('Restaurant ID not found');
-      }
+  final restaurantId = widget.restaurant.id;
 
       // Prepare updated data
       final updatedData = {
@@ -385,8 +372,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
   }
 
   Future<void> _deleteRestaurant() async {
-  final restaurantId = widget.restaurant.id.toString();
-    if (restaurantId == null) return;
+  final restaurantId = widget.restaurant.id;
 
     final confirmed = await showDialog<bool>(
           context: context,
@@ -541,7 +527,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
                           Positioned.fill(
                             child: Container(
                               alignment: Alignment.center,
-                              color: Colors.black.withOpacity(0.2),
+                              color: Colors.black.withAlpha((0.2 * 255).round()),
                               child: const Icon(
                                 Icons.camera_alt,
                                 color: Colors.white,
@@ -561,8 +547,8 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
                                   colors: [
-                                    Colors.white.withOpacity(0.0),
-                                    Colors.white.withOpacity(0.7),
+                                    Colors.white.withAlpha((0.0 * 255).round()),
+                                    Colors.white.withAlpha((0.7 * 255).round()),
                                     Colors.white,
                                   ],
                                   stops: const [0.0, 0.7, 1.0],
@@ -625,7 +611,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
             children: [
               const Icon(Icons.star, color: Colors.amber, size: 18),
               Text(
-                ' ${widget.restaurant.rating?.toString() ?? 'N/A'}',
+                widget.restaurant.rating?.toString() ?? 'N/A',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[700],
@@ -640,7 +626,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
                 ),
               ),
               Text(
-                '${widget.restaurant.hours ?? '9 AM - 9 PM'}',
+                widget.restaurant.hours ?? '9 AM - 9 PM',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[700],
