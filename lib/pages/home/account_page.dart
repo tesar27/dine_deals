@@ -385,7 +385,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withAlpha((0.1 * 255).round()),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -402,7 +402,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: color.withOpacity(0.8),
+                  color: color.withAlpha((0.8 * 255).round()),
                 ),
               ),
             ],

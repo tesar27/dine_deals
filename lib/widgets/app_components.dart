@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+// supabase import removed (unused in this file)
 import 'package:image_picker/image_picker.dart';
+import 'package:dine_deals/models/restaurant_model.dart';
+import 'package:dine_deals/models/deal_model.dart';
 
 // =============================================================================
 // OPTIMIZED UI COMPONENTS - Senior-level reusable widgets
@@ -189,7 +191,8 @@ class RestaurantCard extends StatelessWidget {
     this.showDistance = false,
   });
 
-  final Map<String, dynamic> restaurant;
+  // Prefer typed Restaurant model
+  final Restaurant restaurant;
   final VoidCallback? onTap;
   final bool showDistance;
 
@@ -201,21 +204,21 @@ class RestaurantCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            restaurant['name'] ?? 'Unknown Restaurant',
+            restaurant.name.isNotEmpty ? restaurant.name : 'Unknown Restaurant',
             style: Theme.of(context).textTheme.titleMedium,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
-            restaurant['address'] ?? '',
+            restaurant.address,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          if (showDistance && restaurant['distance'] != null) ...[
+          if (showDistance && restaurant.latitude != null && restaurant.longitude != null) ...[
             const SizedBox(height: 8),
             Row(
               children: [
@@ -226,7 +229,8 @@ class RestaurantCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '${(restaurant['distance'] / 1000).toStringAsFixed(1)} km',
+                  // Distance should ideally come from a helper, for now show '-' if unknown
+                  (restaurant.latitude != null && restaurant.longitude != null) ? '--' : 'N/A',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
                       ),
@@ -245,16 +249,18 @@ class DealCard extends StatelessWidget {
   const DealCard({
     super.key,
     required this.deal,
+    this.restaurant,
     this.onTap,
   });
 
-  final Map<String, dynamic> deal;
+  final Deal deal;
+  final Restaurant? restaurant;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final restaurant = deal['restaurants'] as Map<String, dynamic>?;
-    final discountPercentage = deal['discount_percentage']?.toDouble() ?? 0.0;
+  // If the deal contains embedded restaurant info, prefer typed model
+  final discountPercentage = deal.discountPercentage ?? 0.0;
 
     return AppCard(
       onTap: onTap,
@@ -265,7 +271,7 @@ class DealCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  deal['title'] ?? 'Special Deal',
+                  deal.title,
                   style: Theme.of(context).textTheme.titleMedium,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -289,11 +295,12 @@ class DealCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            deal['description'] ?? '',
+            deal.description ?? '',
             style: Theme.of(context).textTheme.bodyMedium,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          // If a Restaurant model is provided, show it here
           if (restaurant != null) ...[
             const SizedBox(height: 8),
             Row(
@@ -306,7 +313,7 @@ class DealCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    restaurant['name'] ?? '',
+                    restaurant!.name,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -351,11 +358,11 @@ class _AppAvatarState extends State<AppAvatar> {
       children: [
         CircleAvatar(
           radius: widget.size / 2,
-          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           backgroundImage: widget.imageUrl?.isNotEmpty == true
               ? NetworkImage(widget.imageUrl!)
               : null,
-          child: widget.imageUrl?.isEmpty != false
+          child: widget.imageUrl?.isNotEmpty != true
               ? Icon(
                   Icons.person,
                   size: widget.size * 0.6,
@@ -397,39 +404,24 @@ class _AppAvatarState extends State<AppAvatar> {
 
     try {
       final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(
+      final XFile? picked = await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 800,
-        maxHeight: 800,
         imageQuality: 80,
+        maxWidth: 1200,
       );
 
-      if (pickedFile != null && mounted) {
-        final bytes = await pickedFile.readAsBytes();
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+      if (picked == null) return;
 
-        await Supabase.instance.client.storage
-            .from('avatars')
-            .uploadBinary(fileName, bytes);
-
-        if (mounted) {
-          final publicUrl = Supabase.instance.client.storage
-              .from('avatars')
-              .getPublicUrl(fileName);
-
-          widget.onUpload(publicUrl);
-        }
-      }
+      // Callback to pass selected image path (upload handled by caller)
+      widget.onUpload(picked.path);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
+          SnackBar(content: Text('Error picking image: $e')),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 }
@@ -452,7 +444,7 @@ class AppSearchBar extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
+  color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(28),
       ),
       child: TextField(

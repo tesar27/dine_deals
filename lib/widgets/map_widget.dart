@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:dine_deals/providers/app_data_provider.dart';
+import 'package:dine_deals/providers/location_provider.dart';
 import 'package:dine_deals/models/restaurant_model.dart';
 import 'package:dine_deals/models/deal_model.dart';
 
@@ -153,8 +154,8 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
         print("Cities available: ${normalizedCityNames.values.toList()}");
 
-        // Group restaurants by city with improved matching
-        final Map<String, List<Map<String, dynamic>>> restaurantsByCity = {};
+  // Group restaurants by city with improved matching
+  final Map<String, List<Restaurant>> restaurantsByCity = {};
         final Map<String, int> countByCity = {};
 
         for (var restaurant in allRestaurantsData) {
@@ -379,11 +380,11 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.8),
+                    color: Colors.blue.withAlpha((0.8 * 255).round()),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withAlpha((0.3 * 255).round()),
                         spreadRadius: 1,
                         blurRadius: 2,
                         offset: const Offset(0, 1),
@@ -515,7 +516,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       if (_currentZoom >= _cityClusterZoomThreshold) {
         final chosenNormalized = _normalizeCityName(widget.chosenCity);
         filteredRestaurants = sourceRestaurants.where((restaurant) {
-          final address = _normalizeCityName((restaurant.address ?? ''));
+          final address = _normalizeCityName(restaurant.address);
           final cityField = _normalizeCityName((restaurant.city ?? ''));
 
           // Always use normalized comparison for all cities
@@ -527,8 +528,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       }
     }
 
-    print("MapWidget Build: Zoom= ${_currentZoom.toStringAsFixed(2)}, Threshold= $_cityClusterZoomThreshold, " +
-        "Filtered Restaurants= ${filteredRestaurants.length}, ChosenCity= ${widget.chosenCity}");
+  print("MapWidget Build: Zoom= ${_currentZoom.toStringAsFixed(2)}, Threshold= $_cityClusterZoomThreshold, Filtered Restaurants= ${filteredRestaurants.length}, ChosenCity= ${widget.chosenCity}");
 
     return Column(
       children: [
@@ -583,7 +583,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                         CircleMarker(
                           point: _userLocation!,
                           radius: 10,
-                          color: Colors.blue.withOpacity(0.7),
+                          color: Colors.blue.withAlpha((0.7 * 255).round()),
                           borderColor: Colors.white,
                           borderStrokeWidth: 2,
                           useRadiusInMeter: false,
@@ -591,7 +591,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                         CircleMarker(
                           point: _userLocation!,
                           radius: 30,
-                          color: Colors.blue.withOpacity(0.2),
+                          color: Colors.blue.withAlpha((0.2 * 255).round()),
                           useRadiusInMeter: false,
                         ),
                       ],
@@ -647,7 +647,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
+                                        color: Colors.black.withAlpha((0.2 * 255).round()),
                                         blurRadius: 4,
                                         spreadRadius: 2,
                                       ),
@@ -691,11 +691,11 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withAlpha((0.8 * 255).round()),
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withAlpha((0.1 * 255).round()),
                             blurRadius: 4,
                             spreadRadius: 1,
                           ),
@@ -779,11 +779,11 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withAlpha((0.9 * 255).round()),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withAlpha((0.1 * 255).round()),
                         blurRadius: 4,
                         spreadRadius: 1,
                       ),
@@ -815,7 +815,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withAlpha((0.8 * 255).round()),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -833,7 +833,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
+                    color: Colors.black.withAlpha((0.7 * 255).round()),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -1042,7 +1042,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                                     spacing: 8,
                                     runSpacing: 8,
                                     children: deals.take(3).map((deal) {
-                                      final title = (deal is Deal) ? (deal.title ?? deal.name ?? 'Special Offer') : (deal['name']?.toString() ?? 'Special Offer');
+                                        final title = deal.title;
                                       return Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(color: Colors.green[100], borderRadius: BorderRadius.circular(12)),

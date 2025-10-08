@@ -315,7 +315,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withAlpha((0.7 * 255).round()),
                 ),
                 child: IconButton(
                   icon: const Icon(Icons.edit, color: Colors.black),
@@ -374,8 +374,8 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [
-                                  Colors.white.withOpacity(0.0),
-                                  Colors.white.withOpacity(0.7),
+                                  Colors.white.withAlpha((0.0 * 255).round()),
+                                  Colors.white.withAlpha((0.7 * 255).round()),
                                   Colors.white,
                                 ],
                                 stops: const [0.0, 0.7, 1.0],
@@ -409,7 +409,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
                       children: [
                         const Icon(Icons.star, color: Colors.amber, size: 18),
                         Text(
-                          ' ${widget.restaurant.rating?.toString() ?? 'N/A'}',
+                          widget.restaurant.rating?.toString() ?? 'N/A',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[700],
@@ -424,7 +424,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
                           ),
                         ),
                         Text(
-                          '${widget.restaurant.hours ?? '9 AM - 9 PM'}',
+                          widget.restaurant.hours ?? '9 AM - 9 PM',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[700],
