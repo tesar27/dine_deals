@@ -960,7 +960,8 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       barrierColor: Colors.transparent,
       builder: (context) {
         return Padding(
-          padding: const EdgeInsets.only(bottom: 135),
+          // Slightly increased padding to ensure the sheet sits above controls
+          padding: const EdgeInsets.only(bottom: 140),
           child: Align(
             alignment: Alignment.bottomCenter,
             child: SizedBox(
