@@ -2,13 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dine_deals/providers/app_data_provider.dart';
+import 'package:dine_deals/models/restaurant_model.dart';
 import 'package:dine_deals/models/deal_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 
 class EditPlaceDetails extends ConsumerStatefulWidget {
-  final Map<String, dynamic> restaurant;
+  final Restaurant restaurant;
 
   const EditPlaceDetails({super.key, required this.restaurant});
 
@@ -31,14 +32,12 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
   @override
   void initState() {
     super.initState();
-    _nameController =
-        TextEditingController(text: widget.restaurant['name'] ?? '');
-    _addressController =
-        TextEditingController(text: widget.restaurant['address'] ?? '');
-    _ratingController = TextEditingController(
-        text: (widget.restaurant['rating'] ?? '4.5').toString());
-    _hoursController = TextEditingController(
-        text: widget.restaurant['hours'] ?? '9 AM - 9 PM');
+  _nameController = TextEditingController(text: widget.restaurant.name);
+  _addressController = TextEditingController(text: widget.restaurant.address);
+  _ratingController = TextEditingController(
+    text: (widget.restaurant.rating ?? 4.5).toString());
+  _hoursController =
+    TextEditingController(text: widget.restaurant.hours ?? '9 AM - 9 PM');
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchDealsForRestaurant();
@@ -61,7 +60,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
 
     try {
       final dealsNotifier = ref.read(dealsDataProvider.notifier);
-      final restaurantId = widget.restaurant['id']?.toString();
+      final restaurantId = widget.restaurant.id;
 
       if (restaurantId != null) {
           final deals = await dealsNotifier.getDealsForRestaurantTyped(restaurantId);
@@ -200,7 +199,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
                                 ref.read(dealsDataProvider.notifier);
 
                             await dealsNotifier.addDeal(
-                              restaurantId: widget.restaurant['id'].toString(),
+                              restaurantId: widget.restaurant.id,
                               name: nameController.text,
                               description: descriptionController.text,
                               savings: double.parse(savingsController.text),
@@ -250,7 +249,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
     });
 
     try {
-      final restaurantId = widget.restaurant['id']?.toString();
+  final restaurantId = widget.restaurant.id.toString();
       if (restaurantId == null) {
         throw Exception('Restaurant ID not found');
       }
@@ -299,7 +298,8 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
 
       // Update local state and refresh data
       setState(() {
-        widget.restaurant['image_url'] = imageUrl;
+  // Do not mutate the immutable Restaurant model; invalidate provider to refresh
+  ref.invalidate(restaurantDataProvider);
       });
 
       // Refresh restaurants in provider
@@ -333,7 +333,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
     });
 
     try {
-      final restaurantId = widget.restaurant['id']?.toString();
+  final restaurantId = widget.restaurant.id.toString();
       if (restaurantId == null) {
         throw Exception('Restaurant ID not found');
       }
@@ -354,11 +354,8 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
 
       // Update local state
       setState(() {
-        widget.restaurant['name'] = _nameController.text;
-        widget.restaurant['address'] = _addressController.text;
-        widget.restaurant['rating'] =
-            double.tryParse(_ratingController.text) ?? 4.5;
-        widget.restaurant['hours'] = _hoursController.text;
+    // Update will be reflected after provider refresh; update controllers locally
+    // (we do not mutate the Restaurant instance directly)
 
         // Exit edit mode
         _isEditMode = false;
@@ -388,7 +385,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
   }
 
   Future<void> _deleteRestaurant() async {
-    final restaurantId = widget.restaurant['id']?.toString();
+  final restaurantId = widget.restaurant.id.toString();
     if (restaurantId == null) return;
 
     final confirmed = await showDialog<bool>(
@@ -524,7 +521,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
                                     fit: BoxFit.cover,
                                   )
                                 : Image.network(
-                                    widget.restaurant['image_url'] ??
+                                    widget.restaurant.imageUrl ??
                                         'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
                                     width: double.infinity,
                                     height: 300,
@@ -614,7 +611,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
         children: [
           Center(
             child: Text(
-              widget.restaurant['name'] ?? 'Restaurant Name',
+              widget.restaurant.name,
               style: const TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -628,7 +625,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
             children: [
               const Icon(Icons.star, color: Colors.amber, size: 18),
               Text(
-                ' ${widget.restaurant['rating'] ?? 'N/A'}',
+                ' ${widget.restaurant.rating?.toString() ?? 'N/A'}',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[700],
@@ -643,7 +640,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
                 ),
               ),
               Text(
-                '${widget.restaurant['hours'] ?? '9 AM - 9 PM'}',
+                '${widget.restaurant.hours ?? '9 AM - 9 PM'}',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[700],
@@ -666,7 +663,7 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  widget.restaurant['address'] ?? 'No address available',
+                  widget.restaurant.address,
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey[700],
@@ -798,13 +795,11 @@ class _EditPlaceDetailsState extends ConsumerState<EditPlaceDetails> {
                   child: OutlinedButton(
                     onPressed: () {
                       // Reset form and exit edit mode
-                      _nameController.text = widget.restaurant['name'] ?? '';
-                      _addressController.text =
-                          widget.restaurant['address'] ?? '';
-                      _ratingController.text =
-                          (widget.restaurant['rating'] ?? '4.5').toString();
-                      _hoursController.text =
-                          widget.restaurant['hours'] ?? '9 AM - 9 PM';
+            _nameController.text = widget.restaurant.name;
+            _addressController.text = widget.restaurant.address;
+            _ratingController.text =
+              (widget.restaurant.rating ?? 4.5).toString();
+            _hoursController.text = widget.restaurant.hours ?? '9 AM - 9 PM';
 
                       setState(() {
                         _isEditMode = false;

@@ -5,12 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:dine_deals/providers/app_data_provider.dart';
+import 'package:dine_deals/models/restaurant_model.dart';
+import 'package:dine_deals/models/deal_model.dart';
 
 class MapWidget extends ConsumerStatefulWidget {
   final Function(String)? onMarkerTapped;
   final String chosenCity;
   final bool isVisible;
-  final List<Map<String, dynamic>>? restaurants;
+  final List<Restaurant>? restaurants;
 
   const MapWidget({
     super.key,
@@ -45,7 +47,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
   bool _isFiltering = false;
 
   // Add a state variable to track all loaded restaurants (unfiltered)
-  List<Map<String, dynamic>> _allLoadedRestaurants = [];
+  List<Restaurant> _allLoadedRestaurants = [];
 
   @override
   void initState() {
@@ -120,9 +122,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         final cities = await ref.read(cityDataProvider.notifier).fetchCityRecords();
 
         // Step 2: Get restaurants data - use the passed forceRefresh parameter
-        final restaurantsNotifier = ref.read(restaurantDataProvider.notifier);
-        final allRestaurantsData = await restaurantsNotifier.fetchRestaurants(
-            forceRefresh: forceRefresh);
+    final restaurantsNotifier = ref.read(restaurantDataProvider.notifier);
+    final allRestaurantsData = await restaurantsNotifier.fetchRestaurantsTyped(
+      forceRefresh: forceRefresh);
 
         if (!mounted) return;
 
@@ -156,7 +158,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         final Map<String, int> countByCity = {};
 
         for (var restaurant in allRestaurantsData) {
-          final address = restaurant['address']?.toString().toLowerCase() ?? '';
+          final address = restaurant.address.toLowerCase();
 
           // Try to match city by checking if the address contains any known city name
           String? matchedCity;
@@ -281,22 +283,19 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
 
       _mapController.move(LatLng(lat, lng), _currentZoom);
     } else {
-      final restaurantsAsync = ref.read(restaurantDataProvider);
-      restaurantsAsync.whenData((restaurants) {
-        final cityRestaurants = restaurants
-            .where((r) =>
-                r['address'] != null && r['address'].toString().contains(widget.chosenCity))
-            .toList();
+      // Fallback: try to center on the first loaded restaurant in that city
+      final cityRestaurants = _allLoadedRestaurants
+          .where((r) => (r.address).contains(widget.chosenCity) || (r.city ?? '').contains(widget.chosenCity))
+          .toList();
 
-        if (cityRestaurants.isNotEmpty && cityRestaurants[0]['latitude'] != null && cityRestaurants[0]['longitude'] != null) {
-          final lat = double.parse(cityRestaurants[0]['latitude'].toString());
-          final lng = double.parse(cityRestaurants[0]['longitude'].toString());
+      if (cityRestaurants.isNotEmpty && cityRestaurants[0].latitude != null && cityRestaurants[0].longitude != null) {
+        final lat = cityRestaurants[0].latitude!;
+        final lng = cityRestaurants[0].longitude!;
 
-          print("Moving map to restaurant coordinates: $lat, $lng");
+        print("Moving map to restaurant coordinates: $lat, $lng");
 
-          _mapController.move(LatLng(lat, lng), _currentZoom);
-        }
-      });
+        _mapController.move(LatLng(lat, lng), _currentZoom);
+      }
     }
   }
 
@@ -416,31 +415,35 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
   Widget build(BuildContext context) {
     // Use widget.restaurants if provided, otherwise use the restaurantsProvider
     // but with local state management to prevent infinite loading
-    final List<Map<String, dynamic>> sourceRestaurants;
+  final List<Restaurant> sourceRestaurants;
 
     if (widget.restaurants != null && widget.restaurants!.isNotEmpty) {
-      // Use provided restaurants directly
-      sourceRestaurants = widget.restaurants!;
+  // Use provided restaurants directly
+  sourceRestaurants = widget.restaurants!;
     } else if (_allLoadedRestaurants.isNotEmpty) {
-      // Use locally cached restaurants to prevent reloading
-      sourceRestaurants = _allLoadedRestaurants;
+  // Use locally cached restaurants to prevent reloading
+  sourceRestaurants = _allLoadedRestaurants;
     } else {
       // Fall back to provider (only on initial load)
       final restaurantsAsync = ref.watch(restaurantDataProvider);
 
       return restaurantsAsync.when(
         data: (restaurants) {
+          // Convert raw maps to Restaurant typed objects if necessary
+          final typed = (restaurants as List).map((e) =>
+            e is Restaurant ? e : Restaurant.fromMap(e as Map<String, dynamic>)).toList();
+
           // Store the loaded restaurants to prevent future reloads
           if (mounted && _allLoadedRestaurants.isEmpty) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               setState(() {
-                _allLoadedRestaurants = restaurants;
+                _allLoadedRestaurants = typed;
               });
               // Process cities after getting restaurants
               _loadAllRestaurants(forceRefresh: false);
             });
           }
-          return _buildMapContent(restaurants);
+          return _buildMapContent(typed);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
@@ -496,9 +499,9 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
   }
 
   // Extract the map building logic into a separate method
-  Widget _buildMapContent(List<Map<String, dynamic>> sourceRestaurants,
+  Widget _buildMapContent(List<Restaurant> sourceRestaurants,
       {List<dynamic>? cities}) {
-    List<Map<String, dynamic>> filteredRestaurants;
+    List<Restaurant> filteredRestaurants;
 
     // Log the number of restaurants for debugging
     print(
@@ -512,14 +515,11 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       if (_currentZoom >= _cityClusterZoomThreshold) {
         final chosenNormalized = _normalizeCityName(widget.chosenCity);
         filteredRestaurants = sourceRestaurants.where((restaurant) {
-          final address =
-              _normalizeCityName((restaurant['address'] ?? '').toString());
-          final cityField =
-              _normalizeCityName((restaurant['city'] ?? '').toString());
+          final address = _normalizeCityName((restaurant.address ?? ''));
+          final cityField = _normalizeCityName((restaurant.city ?? ''));
 
           // Always use normalized comparison for all cities
-          return address.contains(chosenNormalized) ||
-              cityField.contains(chosenNormalized);
+          return address.contains(chosenNormalized) || cityField.contains(chosenNormalized);
         }).toList();
       } else {
         // When zoomed out, don't show any individual restaurants (only clusters)
@@ -612,20 +612,15 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                       key: const ValueKey("individual-restaurants"),
                       markers: filteredRestaurants.map((restaurant) {
                         // Log some restaurants for debugging
-                        if (filteredRestaurants.indexOf(restaurant) < 3) {
-                          print(
-                              "Creating marker for restaurant: ${restaurant['name']}");
-                        }
+                          if (filteredRestaurants.indexOf(restaurant) < 3) {
+                            print("Creating marker for restaurant: ${restaurant.name}");
+                          }
 
                         // Parse coordinates more safely
                         double? lat, lng;
                         try {
-                          lat = double.tryParse(
-                                  restaurant['latitude']?.toString() ?? '') ??
-                              zurichLat;
-                          lng = double.tryParse(
-                                  restaurant['longitude']?.toString() ?? '') ??
-                              zurichLng;
+                          lat = restaurant.latitude ?? zurichLat;
+                          lng = restaurant.longitude ?? zurichLng;
                         } catch (e) {
                           print("Error parsing coordinates: $e");
                           lat = zurichLat;
@@ -956,8 +951,8 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
     }
   }
 
-  void _showRestaurantCard(
-      BuildContext context, Map<String, dynamic> restaurant) {
+  void _showRestaurantCard(BuildContext context, Restaurant restaurant) {
+    // Replaced entire function to use typed Restaurant and async deals/location loading
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -965,8 +960,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
       barrierColor: Colors.transparent,
       builder: (context) {
         return Padding(
-          padding: const EdgeInsets.only(
-              bottom: 135), // Above filter/list-map buttons
+          padding: const EdgeInsets.only(bottom: 135),
           child: Align(
             alignment: Alignment.bottomCenter,
             child: SizedBox(
@@ -976,105 +970,92 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                 borderRadius: BorderRadius.circular(16),
                 color: Colors.white,
                 child: SingleChildScrollView(
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Image
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            restaurant['imageUrl'] ??
-                                'https://kpceyekfdauxsbljihst.supabase.co/storage/v1/object/public/pictures//cheeseburger-7580676_1280.jpg',
-                            width: 100,
-                            height: 100,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
+                  child: FutureBuilder<List<dynamic>>(
+                    future: Future.wait([
+                      ref.read(dealsDataProvider.notifier).getDealsForRestaurantTyped(restaurant.id),
+                      ref.read(locationNotifierProvider.future).catchError((_) => null),
+                    ]),
+                    builder: (context, snapshot) {
+                      final deals = snapshot.hasData && snapshot.data != null && snapshot.data![0] is List
+                          ? snapshot.data![0] as List<Deal>
+                          : <Deal>[];
+                      final position = snapshot.hasData && snapshot.data!.length > 1 ? snapshot.data![1] : null;
+
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                restaurant.imageUrl ?? 'https://kpceyekfdauxsbljihst.supabase.co/storage/v1/object/public/pictures//cheeseburger-7580676_1280.jpg',
                                 width: 100,
                                 height: 100,
-                                color: Colors.grey[300],
-                                child: const Icon(Icons.restaurant,
-                                    color: Colors.grey),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        // Details
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Title
-                              Text(
-                                restaurant['name'] ?? 'No name',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 100,
+                                    height: 100,
+                                    color: Colors.grey[300],
+                                    child: const Icon(Icons.restaurant, color: Colors.grey),
+                                  );
+                                },
                               ),
-                              const SizedBox(height: 8),
-                              // Stars, distance, address
-                              Row(
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.star,
-                                      size: 16, color: Colors.amber),
-                                  Text(' ${restaurant['rating'] ?? '4.5'} · '),
-                                  if (restaurant['distance'] != null)
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.directions,
-                                            size: 16, color: Colors.blue),
-                                        Text(
-                                            ' ${(restaurant['distance'] as double).toStringAsFixed(1)} km · '),
-                                      ],
-                                    ),
-                                  const Icon(Icons.location_on,
-                                      size: 16, color: Colors.grey),
-                                  Expanded(
-                                    child: Text(
-                                      restaurant['address']?.split(',').first ??
-                                          'No address',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                  Text(
+                                    restaurant.name.isNotEmpty ? restaurant.name : 'No name',
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.star, size: 16, color: Colors.amber),
+                                      Text(' ${restaurant.rating?.toStringAsFixed(1) ?? '4.5'} · '),
+                                      if (position != null && restaurant.latitude != null && restaurant.longitude != null)
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.directions, size: 16, color: Colors.blue),
+                                            Text(' ${const Distance().as(LengthUnit.Kilometer, LatLng((position as Position).latitude, (position).longitude), LatLng(restaurant.latitude!, restaurant.longitude!)).toStringAsFixed(1)} km · '),
+                                          ],
+                                        ),
+                                      const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                                      Expanded(
+                                        child: Text(
+                                          restaurant.address.split(',').first,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: deals.take(3).map((deal) {
+                                      final title = (deal is Deal) ? (deal.title ?? deal.name ?? 'Special Offer') : (deal['name']?.toString() ?? 'Special Offer');
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(color: Colors.green[100], borderRadius: BorderRadius.circular(12)),
+                                        child: Text(title, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                                      );
+                                    }).toList(),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              // Offers
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: (restaurant['deals'] as List? ?? [])
-                                    .take(3)
-                                    .map((deal) => Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.green[100],
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                          child: Text(
-                                            deal['name']?.toString() ??
-                                                'Special Offer',
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.black87),
-                                          ),
-                                        ))
-                                    .toList(),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ),
               ),

@@ -8,6 +8,8 @@ class Restaurant {
   final double? longitude;
   final String? imageUrl;
   final double? rating;
+  final String? hours;
+  final String? minOrder;
   final List<String>? categories;
   final int? dealsCount;
 
@@ -23,6 +25,8 @@ class Restaurant {
     this.rating,
     this.categories,
     this.dealsCount,
+    this.hours,
+    this.minOrder,
   });
 
   factory Restaurant.fromMap(Map<String, dynamic> map) {
@@ -34,8 +38,10 @@ class Restaurant {
       country: map['country']?.toString(),
       latitude: map['latitude'] != null ? double.tryParse(map['latitude'].toString()) : null,
       longitude: map['longitude'] != null ? double.tryParse(map['longitude'].toString()) : null,
-      imageUrl: map['image_url']?.toString() ?? map['imageUrl']?.toString(),
+  imageUrl: map['image_url']?.toString() ?? map['imageUrl']?.toString(),
       rating: map['rating'] != null ? double.tryParse(map['rating'].toString()) : null,
+  hours: map['hours']?.toString(),
+  minOrder: map['minOrder']?.toString() ?? map['min_order']?.toString(),
       categories: map['categories'] == null
           ? null
           : (map['categories'] is List
@@ -58,6 +64,8 @@ class Restaurant {
       'rating': rating,
       'categories': categories,
       'deals_count': dealsCount,
+      'hours': hours,
+      'min_order': minOrder,
     };
   }
 }

@@ -2,13 +2,14 @@ import 'package:dine_deals/pages/details/edit_place_details.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dine_deals/providers/app_data_provider.dart';
+import 'package:dine_deals/models/restaurant_model.dart';
 import 'package:dine_deals/models/deal_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/providers/user_provider.dart';
 
 class PlaceDetails extends ConsumerStatefulWidget {
-  final Map<String, dynamic> restaurant;
+  final Restaurant restaurant;
 
   const PlaceDetails({super.key, required this.restaurant});
 
@@ -34,8 +35,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
   }
 
   Future<void> _checkFavoriteStatus() async {
-    final restaurantId = widget.restaurant['id']?.toString();
-    if (restaurantId == null) return;
+  final restaurantId = widget.restaurant.id.toString();
 
     final prefs = await SharedPreferences.getInstance();
     final favorites = prefs.getStringList('favorites') ?? [];
@@ -71,8 +71,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
   }
 
   Future<void> _toggleFavorite() async {
-    final restaurantId = widget.restaurant['id']?.toString();
-    if (restaurantId == null) return;
+  final restaurantId = widget.restaurant.id.toString();
 
     setState(() {
       _isFavorite = !_isFavorite;
@@ -147,9 +146,9 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
 
     try {
       final dealsNotifier = ref.read(dealsDataProvider.notifier);
-      final restaurantId = widget.restaurant['id']?.toString();
+  final restaurantId = widget.restaurant.id.toString();
 
-      if (restaurantId != null) {
+  if (restaurantId.isNotEmpty) {
           final deals = await dealsNotifier.getDealsForRestaurantTyped(restaurantId);
           setState(() {
             _deals = deals;
@@ -348,7 +347,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
                       children: [
                         Positioned.fill(
                           child: Image.network(
-                            widget.restaurant['image_url'] ??
+                            widget.restaurant.imageUrl ??
                                 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
                             width: double.infinity,
                             height: 300,
@@ -396,7 +395,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
                   children: [
                     Center(
                       child: Text(
-                        widget.restaurant['name'] ?? 'Restaurant Name',
+                        widget.restaurant.name,
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -410,7 +409,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
                       children: [
                         const Icon(Icons.star, color: Colors.amber, size: 18),
                         Text(
-                          ' ${widget.restaurant['rating'] ?? 'N/A'}',
+                          ' ${widget.restaurant.rating?.toString() ?? 'N/A'}',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[700],
@@ -425,7 +424,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
                           ),
                         ),
                         Text(
-                          '${widget.restaurant['hours'] ?? '9 AM - 9 PM'}',
+                          '${widget.restaurant.hours ?? '9 AM - 9 PM'}',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[700],
@@ -440,7 +439,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
                           ),
                         ),
                         Text(
-                          'Min ${widget.restaurant['minOrder'] ?? '15 EUR'}',
+                          'Min ${widget.restaurant.minOrder ?? '15 EUR'}',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[700],
@@ -456,8 +455,7 @@ class _PlaceDetailsState extends ConsumerState<PlaceDetails> {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            widget.restaurant['address'] ??
-                                'No address available',
+                                    widget.restaurant.address,
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.grey[700],

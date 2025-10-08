@@ -7,6 +7,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dine_deals/pages/details/place_details.dart';
+import 'package:dine_deals/models/restaurant_model.dart';
+import 'package:dine_deals/models/deal_model.dart';
 
 class DealsPage extends ConsumerStatefulWidget {
   const DealsPage({super.key});
@@ -24,7 +26,11 @@ class _DealsPageState extends ConsumerState<DealsPage> {
   bool _iconTapped = false;
   bool _isMapView = false;
   List<String> _selectedCategories = ["All"]; // Default to "All"
-  List<Map<String, dynamic>> _filteredRestaurants = [];
+  List<Restaurant> _filteredRestaurants = [];
+  // Map of restaurant id -> list of deals
+  final Map<int, List<Deal>> _restaurantDeals = {};
+  // Map of restaurant id -> distance (km)
+  final Map<int, double> _restaurantDistances = {};
   bool _isLoadingRestaurants = false;
   Position? _currentPosition; // Store user's current position
 
@@ -146,9 +152,8 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     }
 
     try {
-      final restaurantsNotifier =
-          ref.read(restaurantDataProvider.notifier);
-      final allRestaurants = await restaurantsNotifier.fetchRestaurants();
+      final restaurantsNotifier = ref.read(restaurantDataProvider.notifier);
+    final allRestaurants = await restaurantsNotifier.fetchRestaurantsTyped();
 
       if (!mounted || _isDisposed) return;
 
@@ -157,8 +162,8 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       final chosen = normalize(chosenCity);
 
       final cityRestaurants = allRestaurants.where((restaurant) {
-        final address = normalize((restaurant['address'] ?? '').toString());
-        final cityField = normalize((restaurant['city'] ?? '').toString());
+  final address = normalize((restaurant.address ?? ''));
+  final cityField = normalize((restaurant.city ?? ''));
         // Match if either field contains the normalized chosen city
         return address.contains(chosen) || cityField.contains(chosen);
       }).toList();
@@ -528,14 +533,14 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
       // Get category filter (null if "All" is selected)
       final categoryFilter = _selectedCategories.contains("All")
-          ? null
-          : _selectedCategories.isNotEmpty
-              ? _selectedCategories[0]
-              : null;
+      ? null
+      : _selectedCategories.isNotEmpty
+        ? _selectedCategories[0]
+        : null;
 
       // Fetch filtered restaurants
-      final results = await restaurantsNotifier.getFilteredRestaurants(
-        city: chosenCity, // Use the shared city state
+      final results = await restaurantsNotifier.getFilteredRestaurantsTyped(
+        city: chosenCity,
         category: categoryFilter,
       );
 
@@ -544,66 +549,53 @@ class _DealsPageState extends ConsumerState<DealsPage> {
 
       // For each restaurant, fetch its deals
       final dealsNotifier = ref.read(dealsDataProvider.notifier);
-      List<Map<String, dynamic>> restaurantsWithDeals = [];
-
-    for (final restaurant in results) {
+      // For typed restaurants, fetch deals per restaurant and store them in a map
+      for (final restaurant in results) {
         try {
-          final restaurantId = restaurant['id']?.toString();
-          if (restaurantId != null) {
-            final deals =
-                await dealsNotifier.getDealsForRestaurant(restaurantId);
-            // Add deals count to the restaurant map
-            restaurant['deals_count'] = deals.length;
-            restaurant['deals'] = deals;
-          }
-          restaurantsWithDeals.add(restaurant);
+          final deals = await dealsNotifier.getDealsForRestaurantTyped(restaurant.id);
+          _restaurantDeals[restaurant.id] = deals;
         } catch (e) {
-          // Continue with next restaurant if there's an error fetching deals
-          print("Error fetching deals for restaurant: $e");
-          restaurantsWithDeals.add(restaurant);
+          print("Error fetching deals for restaurant ${restaurant.id}: $e");
+          _restaurantDeals[restaurant.id] = [];
         }
       }
+
+      var restaurantsWithDeals = results.toList();
 
       // Check again if still mounted before updating state
       if (!mounted || _isDisposed) return;
 
       // Calculate distance for each restaurant if user position is available
       if (_currentPosition != null) {
-        for (var restaurant in restaurantsWithDeals) {
-          if (restaurant['latitude'] != null &&
-              restaurant['longitude'] != null) {
-            double restaurantLat =
-                double.tryParse(restaurant['latitude'].toString()) ?? 0;
-            double restaurantLng =
-                double.tryParse(restaurant['longitude'].toString()) ?? 0;
-
+        for (final restaurant in restaurantsWithDeals) {
+          if (restaurant.latitude != null && restaurant.longitude != null) {
             final distance = const Distance().as(
               LengthUnit.Kilometer,
               LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-              LatLng(restaurantLat, restaurantLng),
+              LatLng(restaurant.latitude!, restaurant.longitude!),
             );
-
-            restaurant['distance'] = distance;
+            _restaurantDistances[restaurant.id] = distance;
           } else {
-            restaurant['distance'] = double.infinity;
+            _restaurantDistances[restaurant.id] = double.infinity;
           }
         }
 
         // Filter restaurants within radius and sort by distance
         restaurantsWithDeals = restaurantsWithDeals
             .where((restaurant) =>
-                (restaurant['distance'] ?? double.infinity) <= _maxDistanceKm)
+                (_restaurantDistances[restaurant.id] ?? double.infinity) <=
+                _maxDistanceKm)
             .toList()
-          ..sort((a, b) => (a['distance'] ?? double.infinity)
-              .compareTo(b['distance'] ?? double.infinity));
+          ..sort((a, b) => (_restaurantDistances[a.id] ?? double.infinity)
+              .compareTo(_restaurantDistances[b.id] ?? double.infinity));
       }
 
       // Final check if still mounted before updating state
       if (!mounted || _isDisposed) return;
 
       setState(() {
-        _filteredRestaurants = restaurantsWithDeals;
-        _isLoadingRestaurants = false;
+  _filteredRestaurants = restaurantsWithDeals;
+  _isLoadingRestaurants = false;
       });
     } catch (error) {
       print("Error fetching restaurants: $error");
