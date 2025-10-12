@@ -111,32 +111,30 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     if (_currentPosition == null || !mounted || _isDisposed) return;
 
     setState(() {
-      for (var restaurant in _filteredRestaurants) {
-        if (restaurant['latitude'] != null && restaurant['longitude'] != null) {
-          double restaurantLat =
-              double.tryParse(restaurant['latitude'].toString()) ?? 0;
-          double restaurantLng =
-              double.tryParse(restaurant['longitude'].toString()) ?? 0;
-
+      // Compute distances into the typed distance map instead of mutating
+      // Restaurant instances (they are immutable DTOs).
+      for (final restaurant in _filteredRestaurants) {
+        if (restaurant.latitude != null && restaurant.longitude != null) {
           final distance = const Distance().as(
             LengthUnit.Kilometer,
             LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-            LatLng(restaurantLat, restaurantLng),
+            LatLng(restaurant.latitude!, restaurant.longitude!),
           );
-
-          restaurant['distance'] = distance;
+          _restaurantDistances[restaurant.id] = distance;
         } else {
-          restaurant['distance'] = double.infinity;
+          _restaurantDistances[restaurant.id] = double.infinity;
         }
       }
 
-      // Filter restaurants within radius and sort by distance
+      // Filter restaurants within radius and sort by distance using the
+      // separate distance map.
       _filteredRestaurants = _filteredRestaurants
           .where((restaurant) =>
-              (restaurant['distance'] ?? double.infinity) <= _maxDistanceKm)
+              (_restaurantDistances[restaurant.id] ?? double.infinity) <=
+              _maxDistanceKm)
           .toList()
-        ..sort((a, b) => (a['distance'] ?? double.infinity)
-            .compareTo(b['distance'] ?? double.infinity));
+        ..sort((a, b) => (_restaurantDistances[a.id] ?? double.infinity)
+            .compareTo(_restaurantDistances[b.id] ?? double.infinity));
     });
   }
 
@@ -161,8 +159,8 @@ class _DealsPageState extends ConsumerState<DealsPage> {
       String normalize(String s) => s.toLowerCase().replaceAll('ü', 'u').trim();
       final chosen = normalize(chosenCity);
 
-      final cityRestaurants = allRestaurants.where((restaurant) {
-  final address = normalize((restaurant.address ?? ''));
+    final cityRestaurants = allRestaurants.where((restaurant) {
+  final address = normalize(restaurant.address);
   final cityField = normalize((restaurant.city ?? ''));
         // Match if either field contains the normalized chosen city
         return address.contains(chosen) || cityField.contains(chosen);
@@ -871,7 +869,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(12),
                                         child: Image.network(
-                                          restaurant['imageUrl'] ??
+                                          restaurant.imageUrl ??
                                               'https://kpceyekfdauxsbljihst.supabase.co/storage/v1/object/public/pictures//cheeseburger-7580676_1280.jpg',
                                           width: 100,
                                           height: 100,
@@ -922,7 +920,9 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                                           children: [
                                             // First row - Restaurant name
                                             Text(
-                                              restaurant['name'] ?? 'No name',
+                                              restaurant.name.isNotEmpty
+                                                  ? restaurant.name
+                                                  : 'No name',
                                               style: const TextStyle(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
@@ -937,11 +937,12 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                                                 const Icon(Icons.star,
                                                     size: 16,
                                                     color: Colors.amber),
-                                                Text(
-                                                    ' ${restaurant['rating'] ?? '4.5'} · '),
-                                                // Show distance if available
-                                                if (restaurant['distance'] !=
-                                                    null)
+                        Text(
+                          ' ${restaurant.rating != null ? restaurant.rating!.toStringAsFixed(1) : '4.5'} · '),
+                                                // Show distance if available (computed separately)
+                                                if ((_restaurantDistances[restaurant.id] ??
+                                                        double.infinity) !=
+                                                    double.infinity)
                                                   Row(
                                                     children: [
                                                       const Icon(
@@ -949,7 +950,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                                                           size: 16,
                                                           color: Colors.blue),
                                                       Text(
-                                                          ' ${(restaurant['distance'] as double).toStringAsFixed(1)} km · '),
+                                                          ' ${(_restaurantDistances[restaurant.id] ?? 0).toStringAsFixed(1)} km · '),
                                                     ],
                                                   ),
                                                 const Icon(Icons.location_on,
@@ -957,7 +958,7 @@ class _DealsPageState extends ConsumerState<DealsPage> {
                                                     color: Colors.grey),
                                                 Expanded(
                                                   child: Text(
-                                                    ' ${_getShortAddress(restaurant['address'] ?? 'No address')}',
+                                                    ' ${_getShortAddress(restaurant.address)}',
                                                     maxLines: 1,
                                                     overflow:
                                                         TextOverflow.ellipsis,
@@ -1111,24 +1112,11 @@ class _DealsPageState extends ConsumerState<DealsPage> {
     );
   }
 
-  // Helper method to get deals as a list of titles
-  List<String> _getDealsAsList(Map<String, dynamic> restaurant) {
-    // Try to get deals from restaurant data
-    final deals = restaurant['deals'];
-
-    if (deals == null || (deals is List && deals.isEmpty)) {
-      // No deals, return empty list
-      return [];
-    } else if (deals is List) {
-      // Get the deal names, take first 3 deals only
-      return deals
-          .take(3)
-          .map((deal) => deal['name']?.toString() ?? 'Special Offer')
-          .toList();
-    }
-
-    // Fallback case
-    return [];
+  // Helper method to get deals as a list of titles for a typed Restaurant
+  List<String> _getDealsAsList(Restaurant restaurant) {
+    final deals = _restaurantDeals[restaurant.id];
+    if (deals == null || deals.isEmpty) return [];
+    return deals.take(3).map((d) => d.title).toList();
   }
 
   // Helper method to get a shortened address

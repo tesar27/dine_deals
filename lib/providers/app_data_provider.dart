@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dine_deals/models/restaurant_model.dart';
 import 'package:dine_deals/models/deal_model.dart';
 import 'package:dine_deals/models/city_model.dart';
+import 'package:dine_deals/services/cache/hive_repository.dart';
 
 part 'app_data_provider.g.dart';
 
@@ -41,6 +42,7 @@ class RestaurantData extends _$RestaurantData {
       final cacheExpired = cacheAge > (_cacheDurationMinutes * 60 * 1000);
 
       if (!cacheExpired) {
+        // 1) Try SharedPreferences cached JSON first (old behavior)
         final cachedJson = prefs.getString(_cacheKey);
         if (cachedJson != null) {
           try {
@@ -49,6 +51,17 @@ class RestaurantData extends _$RestaurantData {
           } catch (e) {
             debugPrint("Error parsing cached restaurant data: $e");
           }
+        }
+
+        // 2) Fallback: try Hive cache if available (typed storage)
+        try {
+          final hiveList = HiveRepository.getAllRestaurants();
+          if (hiveList.isNotEmpty) {
+            return hiveList.map((r) => r.toMap()).toList();
+          }
+        } catch (e) {
+          // If Hive isn't initialized or available yet, continue to network fetch
+          debugPrint('Hive cache unavailable or empty: $e');
         }
       }
     }
@@ -61,12 +74,20 @@ class RestaurantData extends _$RestaurantData {
 
       final typedData = (data as List<dynamic>).cast<Map<String, dynamic>>();
 
-      // Cache the fresh data
+      // Cache the fresh data to SharedPreferences (backwards compatibility)
       try {
         await prefs.setString(_cacheKey, jsonEncode(typedData));
         await prefs.setString(_cacheTimestampKey, now.toString());
       } catch (e) {
         debugPrint("Error saving restaurant cache: $e");
+      }
+
+      // Also persist typed Restaurant objects to Hive for faster typed reads.
+      try {
+        final restaurants = typedData.map((m) => Restaurant.fromMap(m)).toList();
+        await HiveRepository.saveRestaurants(restaurants);
+      } catch (e) {
+        debugPrint('Error saving restaurants to Hive: $e');
       }
 
       return typedData;
@@ -232,8 +253,19 @@ class RestaurantData extends _$RestaurantData {
   }
 
   Future<void> updateRestaurantImage(int restaurantId, String imageUrl) async {
-    // Placeholder for updating restaurant image
-    throw UnimplementedError('Restaurant image update not implemented yet');
+    try {
+      await Supabase.instance.client
+          .from('restaurants')
+          .update({'image_url': imageUrl})
+          .eq('id', restaurantId);
+
+      // Refresh local cache and invalidate provider so UI updates
+      await fetchRestaurants(forceRefresh: true);
+      ref.invalidateSelf();
+    } catch (error) {
+      debugPrint('Failed to update restaurant image: $error');
+      rethrow;
+    }
   }
 
   Future<bool> checkPlaceExists({required String name, String? address}) async {

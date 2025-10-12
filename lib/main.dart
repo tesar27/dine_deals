@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:dine_deals/services/cache/hive_repository.dart';
 
 /// Global Supabase client instance
 final supabase = Supabase.instance.client;
@@ -27,6 +28,9 @@ Future<void> main() async {
   await dotenv.load(fileName: ".env");
 
   // Initialize Supabase
+  // Initialize local Hive cache (non-blocking but ensure init completes before app uses cache)
+  await HiveRepository.init();
+  
   await Supabase.initialize(
     url: Config.supabaseUrl,
     anonKey: Config.supabaseAnonKey,

@@ -1,4 +1,5 @@
 // ...existing imports...
+import 'package:dine_deals/providers/location_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -154,7 +155,7 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
         print("Cities available: ${normalizedCityNames.values.toList()}");
 
         // Group restaurants by city with improved matching
-        final Map<String, List<Map<String, dynamic>>> restaurantsByCity = {};
+        final Map<String, List<Restaurant>> restaurantsByCity = {};
         final Map<String, int> countByCity = {};
 
         for (var restaurant in allRestaurantsData) {
@@ -1041,11 +1042,11 @@ class _MapWidgetState extends ConsumerState<MapWidget> {
                                     spacing: 8,
                                     runSpacing: 8,
                                     children: deals.take(3).map((deal) {
-                                      final title = (deal is Deal) ? (deal.title ?? deal.name ?? 'Special Offer') : (deal['name']?.toString() ?? 'Special Offer');
+                                      final Deal d = deal as Deal;
                                       return Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(color: Colors.green[100], borderRadius: BorderRadius.circular(12)),
-                                        child: Text(title, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                                        child: Text(d.title, style: const TextStyle(fontSize: 12, color: Colors.black87)),
                                       );
                                     }).toList(),
                                   ),
